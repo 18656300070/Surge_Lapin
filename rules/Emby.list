@@ -1,12 +1,6 @@
-DOMAIN-SUFFIX,emby.nexitally.com
 DOMAIN-SUFFIX,emby.cjpc.cc
 DOMAIN-SUFFIX,emby.flowercloud.yt
-DOMAIN-SUFFIX,emby.maying.club
-DOMAIN-SUFFIX,emby.mdss.cloud
-DOMAIN-SUFFIX,emby.ytoo.li
 DOMAIN-SUFFIX,embyserver.ga
-DOMAIN-SUFFIX,emby.prprcloud.com
-DOMAIN-SUFFIX,emby.nyancat.net
 DOMAIN-SUFFIX,emby.plusmedia.site
 DOMAIN-SUFFIX,emby-cf.plusmedia.site
 DOMAIN-SUFFIX,emby.xeton.dev
@@ -23,11 +17,6 @@ DOMAIN-SUFFIX,ntt1.jmsooo.com
 DOMAIN-SUFFIX,hinet.jmsooo.com
 DOMAIN-SUFFIX,cf1.jmsooo.com
 DOMAIN-SUFFIX,pornemby.club
-DOMAIN-SUFFIX,emby.immtel.com
-DOMAIN-SUFFIX,cf.odysseyplus.site
-DOMAIN-SUFFIX,agahk.odysseyplus.site
-DOMAIN-SUFFIX,agasg.odysseyplus.site
-DOMAIN-SUFFIX,ru.odysseyplus.site
 DOMAIN-SUFFIX,line.emby.men
 DOMAIN-SUFFIX,emby.run
 DOMAIN-SUFFIX,emby.plusmedia.site
@@ -58,10 +47,8 @@ DOMAIN-SUFFIX,poloemby.xyz
 DOMAIN-SUFFIX,pololine.ml
 DOMAIN-SUFFIX,gfwemby.org
 DOMAIN-SUFFIX,loseremby.org
-DOMAIN-SUFFIX,cc.ccemby.tk
 DOMAIN-SUFFIX,direct.nebula-emby.com
 DOMAIN-SUFFIX,magpie.cyou
-DOMAIN-SUFFIX,ccemby.tk
 DOMAIN-SUFFIX,embyplus.club
 DOMAIN-SUFFIX,speedx.one
 DOMAIN-SUFFIX,embymv.tk
@@ -82,7 +69,6 @@ IP-CIDR,202.61.255.248/32
 DOMAIN-SUFFIX,embytv.cf
 DOMAIN-SUFFIX,zox.show
 DOMAIN-SUFFIX,acemby.org
-DOMAIN-SUFFIX,bili.rip
 DOMAIN-SUFFIX,ju.dog
 DOMAIN-SUFFIX,misty.ltd
 DOMAIN-SUFFIX,ednovas.org
@@ -107,10 +93,7 @@ DOMAIN-SUFFIX,4545.cf
 DOMAIN-SUFFIX,ggtt.cf
 DOMAIN-SUFFIX,mulgore.net
 DOMAIN-SUFFIX,happyav.eu.org
-DOMAIN-SUFFIX,emby.misakaf.org
 DOMAIN-SUFFIX,push-kr.cfprefer3.xyz
-DOMAIN-SUFFIX,push-kr.misakaf.org
-DOMAIN-SUFFIX,emby2.misakaf.org
 DOMAIN-SUFFIX,123456.al
 DOMAIN-SUFFIX,emby.pro
 DOMAIN-SUFFIX,xiaoyi.one
@@ -129,8 +112,6 @@ DOMAIN-SUFFIX,ohhhh.org
 DOMAIN-SUFFIX,xmsl.org
 DOMAIN-SUFFIX,9521732.xyz
 DOMAIN-SUFFIX,aca.best
-DOMAIN-SUFFIX,pilipiliultra.top
-DOMAIN-SUFFIX,pilipiliultra.com
 DOMAIN-SUFFIX,polodns.xyz
 DOMAIN-SUFFIX,nijigem.by
 DOMAIN-SUFFIX,semby.ink
@@ -144,13 +125,13 @@ DOMAIN-SUFFIX,emby.at
 DOMAIN-SUFFIX,ycxdy.top
 DOMAIN-SUFFIX,reddust.link
 DOMAIN-SUFFIX,am.sb
-DOMAIN-SUFFIX,stream1.misakaf.org
-DOMAIN-SUFFIX,stream2.misakaf.org
-DOMAIN-SUFFIX,stream3.misakaf.org
-DOMAIN-SUFFIX,stream4.misakaf.org
 DOMAIN-SUFFIX,stream_pilipili.misakaf.org
 DOMAIN-SUFFIX,niceduck.me
 DOMAIN-SUFFIX,niceduck.lol
 ###21.06.02__154 lines
+
 DOMAIN-SUFFIX,peachmv.me
 DOMAIN-SUFFIX,embymv.link
+DOMAIN-SUFFIX,cc.coemn.com
+DOMAIN-SUFFIX,pilipili.club
+DOMAIN-SUFFIX,emby.as174.de
