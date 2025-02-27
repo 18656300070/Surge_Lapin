@@ -10,3 +10,6 @@ DOMAIN-SUFFIX,redotpay.com
 DOMAIN-SUFFIX,redotpay.zendesk.com
 DOMAIN-SUFFIX,zendesk.com
 DOMAIN-KEYWORD,redotpay
+###
+DOMAIN-SUFFIX,*.frguyana.space
+###
