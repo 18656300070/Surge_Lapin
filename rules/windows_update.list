@@ -8,3 +8,4 @@ DOMAIN-SUFFIX,windowsupdate.com
 
 #补充规则
 DOMAIN-SUFFIX,download.visualstudio.microsoft.com
+DOMAIN-SUFFIX,update.code.visualstudio.com
