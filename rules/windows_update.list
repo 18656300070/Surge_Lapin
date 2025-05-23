@@ -5,3 +5,6 @@ DOMAIN-KEYWORD,download.microsoft.com
 DOMAIN-KEYWORD,tlu.dl.delivery.mp.microsoft.com
 DOMAIN-KEYWORD,t-ring.trafficmanager.net
 DOMAIN-SUFFIX,windowsupdate.com
+
+#补充规则
+DOMAIN-SUFFIX,download.visualstudio.microsoft.com
