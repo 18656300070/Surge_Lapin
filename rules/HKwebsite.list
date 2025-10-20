@@ -1,0 +1,9 @@
+###香港家宽代理运行
+
+###gg卡
+DOMAIN-SUFFIX,giffgaff.com
+#银行服务
+DOMAIN-SUFFIX,redotpay.com
+DOMAIN-SUFFIX,redotpay.zendesk.com
+DOMAIN-SUFFIX,zendesk.com
+DOMAIN-KEYWORD,redotpay
