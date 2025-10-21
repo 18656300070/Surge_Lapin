@@ -1,4 +1,9 @@
 ###香港家宽代理运行
+###Deepl翻译
+DOMAIN-SUFFIX,w.deepl.com
+DOMAIN-SUFFIX,s.deepl.com
+DOMAIN-SUFFIX,static.deepl.com
+DOMAIN-SUFFIX,dict.deepl.com
 
 ###gg卡
 DOMAIN-SUFFIX,giffgaff.com
