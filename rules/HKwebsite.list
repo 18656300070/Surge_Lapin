@@ -4,6 +4,11 @@ DOMAIN-SUFFIX,w.deepl.com
 DOMAIN-SUFFIX,s.deepl.com
 DOMAIN-SUFFIX,static.deepl.com
 DOMAIN-SUFFIX,dict.deepl.com
+DOMAIN-SUFFIX,deepl.com
+DOMAIN-KEYWORD,deepl
+
+grammarly.com
+grammarly.io
 
 ###gg卡
 DOMAIN-SUFFIX,giffgaff.com
