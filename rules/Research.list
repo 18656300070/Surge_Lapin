@@ -1,3 +1,4 @@
+###主要学术类型域名
 DOMAIN-SUFFIX,scholar.google.com
 DOMAIN-SUFFIX,colab.research.google.com
 DOMAIN-SUFFIX,kaggle.com
@@ -8,3 +9,6 @@ DOMAIN-SUFFIX,sci-hub.in
 DOMAIN-SUFFIX,wellesu.com
 DOMAIN-SUFFIX,tesble.com
 DOMAIN-SUFFIX,pismin.com
+
+###python库
+DOMAIN-SUFFIX,pypi.org
