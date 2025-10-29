@@ -3,3 +3,6 @@ DOMAIN-SUFFIX,api.augmentcode.com
 DOMAIN-SUFFIX,api.d9.api.augmentcode.com
 DOMAIN-SUFFIX,augmentcode.com
 DOMAIN-SUFFIX,app.augmentcode.com
+
+#Api网站
+DOMAIN-SUFFIX,ai.hybgzs.com
