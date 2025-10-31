@@ -12,3 +12,4 @@ DOMAIN-SUFFIX,pismin.com
 
 ###python库
 DOMAIN-SUFFIX,pypi.org
+DOMAIN-SUFFIX,download.pytorch.org
