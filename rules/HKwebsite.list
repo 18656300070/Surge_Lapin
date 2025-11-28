@@ -1,4 +1,4 @@
-###香港Azure代理运行
+#香港稳定ip运行
 
 ###gg卡
 DOMAIN-SUFFIX,giffgaff.com
@@ -9,3 +9,8 @@ DOMAIN-SUFFIX,api.redotpay.com
 DOMAIN-SUFFIX,redotpay.zendesk.com
 DOMAIN-SUFFIX,zendesk.com
 DOMAIN-KEYWORD,redotpay
+
+###国内论坛
+DOMAIN-SUFFIX,linux.do
+DOMAIN-SUFFIX,nodeseek.com
+DOMAIN-SUFFIX,deepflood.com
