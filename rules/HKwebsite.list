@@ -1,4 +1,4 @@
-###香港Azure代理运行
+#香港稳定ip运行
 
 ###gg卡
 DOMAIN-SUFFIX,giffgaff.com
@@ -10,24 +10,11 @@ DOMAIN-SUFFIX,redotpay.zendesk.com
 DOMAIN-SUFFIX,zendesk.com
 DOMAIN-KEYWORD,redotpay
 
-###Deepl翻译
-DOMAIN-SUFFIX,w.deepl.com
-DOMAIN-SUFFIX,s.deepl.com
-DOMAIN-SUFFIX,static.deepl.com
-DOMAIN-SUFFIX,dict.deepl.com
-DOMAIN-SUFFIX,deepl.com
-DOMAIN-SUFFIX,app.deepl.com
-DOMAIN-SUFFIX,login.deepl.com
-DOMAIN-SUFFIX,api.deepl.com
-DOMAIN-KEYWORD,deepl
+###国内论坛
+DOMAIN-SUFFIX,linux.do
+DOMAIN-SUFFIX,nodeseek.com
+DOMAIN-SUFFIX,deepflood.com
 
-###Grammarly翻译
-DOMAIN-SUFFIX,grammarly.com
-DOMAIN-SUFFIX,grammarly.io
-info.grammarly.com
-mail.grammarly.com
-notification.grammarly.com
-notifications.grammarly.com
-bounce.send.grammarly.com
-send.grammarly.com
-grammarly.zendesk.com
+###个人域名网站
+DOMAIN-SUFFIX,vps.frguyana.space
+DOMAIN-SUFFIX,frguyana.space
