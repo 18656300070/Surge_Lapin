@@ -1,4 +1,9 @@
-#25.04
+#25.12.18
+DOMAIN-SUFFIX,l.poloemby.xyz
+DOMAIN-SUFFIX,cf.xmsl.org
+DOMAIN-SUFFIX,emby.pilipiliultra.com
+
+#25.10.10
 DOMAIN-SUFFIX,peachmv.me
 DOMAIN-SUFFIX,embymv.link
 DOMAIN-SUFFIX,cc.coemn.com
@@ -10,7 +15,6 @@ DOMAIN-SUFFIX,emby.jingzhe.pro
 DOMAIN-SUFFIX,stream2.jingzhe.pro
 DOMAIN-SUFFIX,media.nijigem.by
 DOMAIN-SUFFIX,nijigem.by
-DOMAIN-SUFFIX,emby.pilipiliultra.com
 DOMAIN-SUFFIX,pilipiliultra.com
 
 #25.06
@@ -18,12 +22,15 @@ DOMAIN-SUFFIX,emby1.123456789.lol
 DOMAIN-SUFFIX,123456789.lol
 DOMAIN-SUFFIX,gy.meowfly.de
 DOMAIN-SUFFIX,meowfly.de
-DOMAIN-SUFFIX,media.nijigem.by
 DOMAIN-SUFFIX,emby-direct.pilipiliultra.com
 DOMAIN-SUFFIX,streamer.pilipiliultra.com
 DOMAIN-SUFFIX,clusterf6d94702.sakata.one
 DOMAIN-SUFFIX,carryz.net
+DOMAIN-SUFFIX,emby.feiniu.lol
 
+#25.04
+
+###21.06.02__154 lines
 DOMAIN-SUFFIX,emby.cjpc.cc
 DOMAIN-SUFFIX,emby.flowercloud.yt
 DOMAIN-SUFFIX,embyserver.ga
@@ -45,13 +52,7 @@ DOMAIN-SUFFIX,cf1.jmsooo.com
 DOMAIN-SUFFIX,pornemby.club
 DOMAIN-SUFFIX,line.emby.men
 DOMAIN-SUFFIX,emby.run
-DOMAIN-SUFFIX,emby.plusmedia.site
 DOMAIN-SUFFIX,emby-sg.plusmedia.site
-DOMAIN-SUFFIX,emby-cf.plusmedia.site
-DOMAIN-SUFFIX,emby.xeton.dev
-DOMAIN-SUFFIX,jellyfin.xeton.dev
-DOMAIN-SUFFIX,movie.xeton.dev
-DOMAIN-SUFFIX,servers.xeton.dev
 DOMAIN-SUFFIX,jmsooo.com
 DOMAIN-SUFFIX,cf.jmsooo.com
 DOMAIN-SUFFIX,hk.jmsooo.com
@@ -100,7 +101,6 @@ DOMAIN-SUFFIX,misty.ltd
 DOMAIN-SUFFIX,ednovas.org
 DOMAIN-SUFFIX,deja-vu.beauty
 DOMAIN-SUFFIX,studyfun.live
-DOMAIN-SUFFIX,charontv.com
 DOMAIN-SUFFIX,gtlx.org
 DOMAIN-SUFFIX,9191001.xyz
 DOMAIN-SUFFIX,carlos.trade
@@ -127,10 +127,8 @@ DOMAIN-SUFFIX,embymv.me
 DOMAIN-SUFFIX,infinityfly.top
 DOMAIN-SUFFIX,lucasmedia.top
 DOMAIN-SUFFIX,nvidia.rip
-DOMAIN-SUFFIX,emby77.org
 DOMAIN-SUFFIX,20120714.xyz
 DOMAIN-SUFFIX,gugumedia.link
-DOMAIN-SUFFIX,dicarerhome.com
 DOMAIN-SUFFIX,starcat.eu.org
 DOMAIN-SUFFIX,catlinks.co.uk
 DOMAIN-SUFFIX,emby.ws
@@ -139,7 +137,6 @@ DOMAIN-SUFFIX,xmsl.org
 DOMAIN-SUFFIX,9521732.xyz
 DOMAIN-SUFFIX,aca.best
 DOMAIN-SUFFIX,polodns.xyz
-DOMAIN-SUFFIX,nijigem.by
 DOMAIN-SUFFIX,semby.ink
 DOMAIN-SUFFIX,embypaul.top
 DOMAIN-SUFFIX,lzlz.eu.org
@@ -154,23 +151,3 @@ DOMAIN-SUFFIX,am.sb
 DOMAIN-SUFFIX,stream_pilipili.misakaf.org
 DOMAIN-SUFFIX,niceduck.me
 DOMAIN-SUFFIX,niceduck.lol
-###21.06.02__154 lines
-
-DOMAIN-SUFFIX,peachmv.me
-DOMAIN-SUFFIX,embymv.link
-DOMAIN-SUFFIX,cc.coemn.com
-DOMAIN-SUFFIX,pilipili.club
-DOMAIN-SUFFIX,emby.as174.de
-DOMAIN-SUFFIX,hxd.as174.de
-DOMAIN-SUFFIX,emby.yunti.online
-DOMAIN-SUFFIX,emby.jingzhe.pro
-DOMAIN-SUFFIX,stream2.jingzhe.pro
-
-#25.06.06
-DOMAIN-SUFFIX,emby1.123456789.lol
-DOMAIN-SUFFIX,gy.meowfly.de
-DOMAIN-SUFFIX,emby.feiniu.lol
-DOMAIN-SUFFIX,media.nijigem.by
-DOMAIN-SUFFIX,emby-direct.pilipiliultra.com
-DOMAIN-SUFFIX,streamer.pilipiliultra.com
-DOMAIN-SUFFIX,clusterf6d94702.sakata.one
