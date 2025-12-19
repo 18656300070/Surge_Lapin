@@ -14,11 +14,6 @@ DOMAIN-SUFFIX,pismin.com
 DOMAIN-SUFFIX,pypi.org
 DOMAIN-SUFFIX,download.pytorch.org
 
-###国内论坛
-DOMAIN-SUFFIX,linux.do
-DOMAIN-SUFFIX,nodeseek.com
-DOMAIN-SUFFIX,deepflood.com
-
 ###个人域名网站
 DOMAIN-SUFFIX,vps.frguyana.space
 DOMAIN-SUFFIX,wallos.frguyana.space
