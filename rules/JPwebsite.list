@@ -18,8 +18,6 @@ DOMAIN-SUFFIX,nijie.info
 DOMAIN-SUFFIX,seiga.nicovideo.jp
 
 # --- Video / Streaming ---
-DOMAIN-SUFFIX,niconico.jp
-DOMAIN-SUFFIX,nicovideo.jp
 DOMAIN-SUFFIX,abema.tv
 DOMAIN-SUFFIX,twitcasting.tv
 
