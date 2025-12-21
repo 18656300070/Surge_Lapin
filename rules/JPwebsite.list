@@ -1,0 +1,41 @@
+# ==================================
+# Category: JP Anime & Entertainment
+# Scope: Anime / Manga / Doujin / Game
+# ==================================
+
+# --- Creator / Fan Support ---
+DOMAIN-SUFFIX,fantia.jp
+DOMAIN-SUFFIX,fanbox.cc          # Pixiv FANBOX
+DOMAIN-SUFFIX,ci-en.net
+DOMAIN-SUFFIX,booth.pm
+DOMAIN-SUFFIX,skeb.jp
+DOMAIN-SUFFIX,patreon.com        # 日本创作者大量使用
+
+# --- Illustration / Manga ---
+DOMAIN-SUFFIX,pixiv.net
+DOMAIN-SUFFIX,pixiv.me
+DOMAIN-SUFFIX,nijie.info
+DOMAIN-SUFFIX,seiga.nicovideo.jp
+
+# --- Video / Streaming ---
+DOMAIN-SUFFIX,niconico.jp
+DOMAIN-SUFFIX,nicovideo.jp
+DOMAIN-SUFFIX,abema.tv
+DOMAIN-SUFFIX,twitcasting.tv
+
+# --- Game / Doujin ---
+DOMAIN-SUFFIX,dlsite.com
+DOMAIN-SUFFIX,dlsite.jp
+DOMAIN-SUFFIX,melonbooks.co.jp
+DOMAIN-SUFFIX,tora.co.jp
+
+# --- Anime / Info Portal ---
+DOMAIN-SUFFIX,animate.co.jp
+DOMAIN-SUFFIX,animeanime.jp
+DOMAIN-SUFFIX,myanimelist.net
+DOMAIN-SUFFIX,aniplex.co.jp
+DOMAIN-SUFFIX,bandainamcoent.co.jp
+
+# --- Music / Radio (ACG related) ---
+DOMAIN-SUFFIX,radiko.jp
+DOMAIN-SUFFIX,recochoku.jp
