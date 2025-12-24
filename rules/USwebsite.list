@@ -1,5 +1,6 @@
 ###主要学术类型域名
 DOMAIN,scholar.google.com
+DOMAIN-SUFFIX,scholar.google.com
 DOMAIN-SUFFIX,colab.research.google.com
 DOMAIN-SUFFIX,kaggle.com
 DOMAIN-SUFFIX,zh.annas-archive.org
