@@ -17,3 +17,6 @@ DOMAIN-SUFFIX,download.pytorch.org
 DOMAIN-SUFFIX,vps.frguyana.space
 DOMAIN-SUFFIX,wallos.frguyana.space
 DOMAIN-SUFFIX,frguyana.space
+
+###收集网站
+DOMAIN-SUFFIX,vipcloud.cc
