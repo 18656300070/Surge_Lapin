@@ -1,4 +1,6 @@
 #26.01.02
+
+IP-CIDR,193.123.232.0/32,no-resolve
 DOMAIN-SUFFIX,kessoku-bando.biliblili.uk
 DOMAIN-SUFFIX,cflocal.xxlb.net
 
