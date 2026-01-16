@@ -1,7 +1,12 @@
-#26.01.02
-IP-CIDR,193.123.232.0/24,no-resolve
-DOMAIN-SUFFIX,kessoku-bando.biliblili.uk
+#26.01.16
+IP-CIDR,193.123.232.141,no-resolve
 DOMAIN-SUFFIX,cflocal.xxlb.net
+DOMAIN-SUFFIX,lt1.carryz.net
+DOMAIN-SUFFIX,default.cdn.bgp.yt
+DOMAIN-SUFFIX,streaming.biliblili.uk
+
+#26.01.02
+DOMAIN-SUFFIX,kessoku-bando.biliblili.uk
 
 #25.12.18
 DOMAIN-SUFFIX,l.poloemby.xyz
