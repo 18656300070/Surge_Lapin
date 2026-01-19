@@ -9,6 +9,10 @@ DOMAIN-SUFFIX,wellesu.com
 DOMAIN-SUFFIX,tesble.com
 DOMAIN-SUFFIX,pismin.com
 
+###域名相关
+DOMAIN-SUFFIX,cloudflare.com
+DOMAIN-SUFFIX,paceship.com
+
 ###python库
 DOMAIN-SUFFIX,pypi.org
 DOMAIN-SUFFIX,download.pytorch.org
