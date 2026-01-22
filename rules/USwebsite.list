@@ -21,6 +21,7 @@ DOMAIN-SUFFIX,download.pytorch.org
 DOMAIN-SUFFIX,ieeei.study
 DOMAIN-SUFFIX,vps.ieeei.study
 DOMAIN-SUFFIX,wallos.ieeei.study
+DOMAIN-SUFFIX,sms.ieeei.study
 
 ###收集网站
 DOMAIN-SUFFIX,dmit.io
