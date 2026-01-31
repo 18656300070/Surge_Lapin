@@ -14,6 +14,7 @@ DOMAIN-SUFFIX,api.nlvps.hidns.co
 DOMAIN-SUFFIX,antigravity-unleash.goog
 DOMAIN-SUFFIX,daily-cloudcode-pa.googleapis.com
 
+#Nodeseek友友贡献
 DOMAIN-SUFFIX,ai.azure.com
 DOMAIN-SUFFIX,api.githubcopilot.com
 DOMAIN-SUFFIX,api.jetbrains.ai
@@ -60,7 +61,6 @@ DOMAIN-SUFFIX,fal.ai
 DOMAIN-SUFFIX,fireflies.ai
 DOMAIN-SUFFIX,fireworks.ai
 DOMAIN-SUFFIX,githubcopilot.com
-DOMAIN-SUFFIX,grammarly.com
 DOMAIN-SUFFIX,grok.com
 DOMAIN-SUFFIX,groq.com
 DOMAIN-SUFFIX,hf.co
