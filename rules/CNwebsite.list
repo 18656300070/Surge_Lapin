@@ -1,3 +1,9 @@
-###游戏论坛
+##国内直连Emby
+DOMAIN-SUFFIX,www.lilyemby.com
+DOMAIN-SUFFIX,cdn.lilyemby.com
+DOMAIN-SUFFIX,tx.lilyemby.com
+DOMAIN-SUFFIX,aliyun.lilyemby.com
+
+##游戏论坛
 DOMAIN-SUFFIX,xdgame.com
 DOMAIN-SUFFIX,52pojie.cn
