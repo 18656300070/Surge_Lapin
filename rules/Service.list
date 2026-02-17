@@ -1,5 +1,10 @@
 #亚太非港区网站
 
+###国内论坛
+DOMAIN-SUFFIX,linux.do
+DOMAIN-SUFFIX,nodeseek.com
+DOMAIN-SUFFIX,deepflood.com
+
 ###Grammarly翻译
 DOMAIN-SUFFIX,grammarly.com
 DOMAIN-SUFFIX,grammarly.io
