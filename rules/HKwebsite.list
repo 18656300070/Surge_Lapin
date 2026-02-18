@@ -20,3 +20,15 @@ DOMAIN-SUFFIX,app.deepl.com
 DOMAIN-SUFFIX,login.deepl.com
 DOMAIN-SUFFIX,api.deepl.com
 DOMAIN-KEYWORD,deepl
+
+###Grammarly翻译
+DOMAIN-SUFFIX,grammarly.com
+DOMAIN-SUFFIX,grammarly.io
+DOMAIN-SUFFIX,info.grammarly.com
+DOMAIN-SUFFIX,mail.grammarly.com
+DOMAIN-SUFFIX,notification.grammarly.com
+DOMAIN-SUFFIX,notifications.grammarly.com
+DOMAIN-SUFFIX,bounce.send.grammarly.com
+DOMAIN-SUFFIX,send.grammarly.com
+DOMAIN-SUFFIX,grammarly.zendesk.com
+DOMAIN-SUFFIX,grammarly.zendesk.com
