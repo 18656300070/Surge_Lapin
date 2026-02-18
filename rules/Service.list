@@ -1,18 +1,6 @@
-#亚太非港区网站
+#境内域外网站
 
 ###国内论坛
 DOMAIN-SUFFIX,linux.do
 DOMAIN-SUFFIX,nodeseek.com
 DOMAIN-SUFFIX,deepflood.com
-
-###Grammarly翻译
-DOMAIN-SUFFIX,grammarly.com
-DOMAIN-SUFFIX,grammarly.io
-DOMAIN-SUFFIX,info.grammarly.com
-DOMAIN-SUFFIX,mail.grammarly.com
-DOMAIN-SUFFIX,notification.grammarly.com
-DOMAIN-SUFFIX,notifications.grammarly.com
-DOMAIN-SUFFIX,bounce.send.grammarly.com
-DOMAIN-SUFFIX,send.grammarly.com
-DOMAIN-SUFFIX,grammarly.zendesk.com
-DOMAIN-SUFFIX,grammarly.zendesk.com
