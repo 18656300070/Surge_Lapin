@@ -2,6 +2,9 @@
 
 #动漫网站
 DOMAIN-SUFFIX,bangumi.tv
+DOMAIN-SUFFIX,api.bangumi.tv
+DOMAIN-SUFFIX,lain.bangumi.tv
+DOMAIN-SUFFIX,sentry.aniopara.com
 DOMAIN-SUFFIX,bangumi.moe
 
 #银行服务
