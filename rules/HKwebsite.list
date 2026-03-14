@@ -1,5 +1,9 @@
 #香港稳定ip运行
 
+#动漫网站
+DOMAIN-SUFFIX,bangumi.tv
+DOMAIN-SUFFIX,bangumi.moe
+
 #银行服务
 DOMAIN-SUFFIX,redotpay.com
 DOMAIN-SUFFIX,api.redotpay.com
