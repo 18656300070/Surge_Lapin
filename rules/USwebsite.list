@@ -11,13 +11,16 @@ DOMAIN-SUFFIX,pismin.com
 
 ###域名相关
 DOMAIN-SUFFIX,cloudflare.com
-DOMAIN-SUFFIX,paceship.com
+DOMAIN-SUFFIX,spaceship.com
 
 ###python库
 DOMAIN-SUFFIX,pypi.org
 DOMAIN-SUFFIX,download.pytorch.org
 
 ###个人域名网站
+DOMAIN-SUFFIX,funo.top
+DOMAIN-SUFFIX,vps.funo.top
+DOMAIN-SUFFIX,sms.funo.top
 DOMAIN-SUFFIX,ieeei.study
 DOMAIN-SUFFIX,vps.ieeei.study
 DOMAIN-SUFFIX,wallos.ieeei.study
