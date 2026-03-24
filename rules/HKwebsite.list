@@ -1,6 +1,8 @@
 #香港稳定ip运行
 
 #动漫网站
+DOMAIN-SUFFIX,bgm.tv
+DOMAIN-SUFFIX,api.bgm.tv
 DOMAIN-SUFFIX,bangumi.tv
 DOMAIN-SUFFIX,api.bangumi.tv
 DOMAIN-SUFFIX,lain.bangumi.tv
