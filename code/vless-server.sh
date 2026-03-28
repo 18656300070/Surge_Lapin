@@ -1,6 +1,6 @@
 #!/bin/bash 
 #═══════════════════════════════════════════════════════════════════════════════
-#  多协议代理一键部署脚本 v3.4.10 [服务端]
+#  多协议代理一键部署脚本 v3.5.3 [服务端]
 #  
 #  架构升级:
 #    • Xray 核心: 处理 TCP/TLS 协议 (VLESS/VMess/Trojan/SOCKS/SS2022)
@@ -8,20 +8,20 @@
 #  
 #  支持协议: VLESS+Reality / VLESS+Reality+XHTTP / VLESS+WS / VMess+WS / 
 #           VLESS-XTLS-Vision / SOCKS5 / SS2022 / HY2 / Trojan / 
-#           Snell v4 / Snell v5 / AnyTLS / TUIC / NaïveProxy (共14种)
+#           Snell v4 / Snell v5 / AnyTLS / TUIC / NaïveProxy (多协议)
 #  插件支持: Snell v4/v5 和 SS2022 可选启用 ShadowTLS
 #  适配: Alpine/Debian/Ubuntu/CentOS
 #  
 #  
-#  作者: Chil30
-#  项目地址: https://gitlab.com/chil30-group/vless-all-in-one
+#  作者: Zyx0rx
+#  项目地址: https://github.com/Zyx0rx/vless-all-in-one
 #═══════════════════════════════════════════════════════════════════════════════
 
-readonly VERSION="3.4.10"
-readonly AUTHOR="Chil30"
-readonly REPO_URL="https://gitlab.com/chil30-group/vless-all-in-one"
-readonly SCRIPT_REPO="chil30-group/vless-all-in-one"
-readonly SCRIPT_RAW_URL="https://gitlab.com/chil30-group/vless-all-in-one/-/raw/main/vless-server.sh"
+readonly VERSION="3.5.3"
+readonly AUTHOR="Zyx0rx"
+readonly REPO_URL="https://github.com/Zyx0rx/vless-all-in-one"
+readonly SCRIPT_REPO="Zyx0rx/vless-all-in-one"
+readonly SCRIPT_RAW_URL="https://raw.githubusercontent.com/Zyx0rx/vless-all-in-one/main/vless-server.sh"
 readonly CFG="/etc/vless-reality"
 readonly ACME_DEFAULT_EMAIL="acme@vaio.com"
 
@@ -1297,10 +1297,10 @@ send_tg_message() {
 send_tg_expire_warning() {
     local name="$1" proto="$2" expire_date="$3" days_left="$4"
     local proto_name=$(get_protocol_name "$proto")
-    local hostname=$(hostname 2>/dev/null || echo "服务器")
+    local server_display=$(get_tg_server_display)
     
     local message="⚠️ *用户即将过期*
-🖥 服务器: \`$hostname\`
+${server_display}
 👤 用户: \`$name\`
 📋 协议: $proto_name
 📅 到期: $expire_date
@@ -1313,10 +1313,10 @@ send_tg_expire_warning() {
 send_tg_expired_notice() {
     local name="$1" proto="$2" expire_date="$3"
     local proto_name=$(get_protocol_name "$proto")
-    local hostname=$(hostname 2>/dev/null || echo "服务器")
+    local server_display=$(get_tg_server_display)
     
     local message="🚫 *用户已过期禁用*
-🖥 服务器: \`$hostname\`
+${server_display}
 👤 用户: \`$name\`
 📋 协议: $proto_name
 📅 到期: $expire_date"
@@ -1371,22 +1371,22 @@ send_expire_warnings() {
 # 安装过期检查 cron job (每天 3:00)
 install_expire_check_cron() {
     local script_path="$0"
-    local cron_cmd="0 3 * * * $script_path --check-expire --notify >/dev/null 2>&1"
+    local cron_cmd="$(build_cron_command "0 3 * * *" "$script_path" "--check-expire --notify" "$CFG/expire.log") # check-expire"
     
     if crontab -l 2>/dev/null | grep -q "check-expire"; then
         _info "过期检查 cron 已存在"
         return 0
     fi
     
-    (crontab -l 2>/dev/null; echo "$cron_cmd") | crontab -
-    [[ $? -eq 0 ]] && _ok "已安装过期检查 cron (每天 3:00)" || _err "安装失败"
+    [[ -n "$(get_bash_interpreter)" ]] || { _err "未找到 bash，无法安装过期检查 cron"; return 1; }
+    install_cron_entry "check-expire" "$cron_cmd" && { _ok "已安装过期检查 cron (每天 3:00)"; echo -e "  ${D}日志: $CFG/expire.log${NC}"; } || _err "安装失败"
 }
 
 # 确保过期检查 cron 已安装（设置到期日期时自动调用）
 # 返回: 0=已存在, 1=新安装成功, 2=安装失败
 ensure_expire_check_cron() {
     local script_path="$(readlink -f "$0" 2>/dev/null || echo "$0")"
-    local cron_cmd="0 3 * * * $script_path --check-expire --notify >/dev/null 2>&1"
+    local cron_cmd="$(build_cron_command "0 3 * * *" "$script_path" "--check-expire --notify" "$CFG/expire.log") # check-expire"
     
     # 如果已存在则跳过
     if crontab -l 2>/dev/null | grep -q "check-expire"; then
@@ -1395,8 +1395,14 @@ ensure_expire_check_cron() {
     fi
     
     # 尝试安装
-    if (crontab -l 2>/dev/null; echo "$cron_cmd") | crontab - 2>/dev/null; then
+    if [[ -z "$(get_bash_interpreter)" ]]; then
+        echo -e "  ${Y}提示: 未找到 bash，无法安装过期检查定时任务${NC}"
+        return 2
+    fi
+
+    if install_cron_entry "check-expire" "$cron_cmd"; then
         echo -e "  ${G}✓ 已自动安装过期检查定时任务 (每天 3:00)${NC}"
+        echo -e "  ${D}日志: $CFG/expire.log${NC}"
         return 1
     else
         echo -e "  ${Y}提示: 过期检查定时任务未安装，可运行: ./vless-server.sh --setup-expire-cron${NC}"
@@ -1406,7 +1412,7 @@ ensure_expire_check_cron() {
 
 # 卸载过期检查 cron
 uninstall_expire_check_cron() {
-    crontab -l 2>/dev/null | grep -v "check-expire" | crontab -
+    remove_cron_entry "check-expire"
     _ok "已移除过期检查 cron"
 }
 
@@ -1571,7 +1577,21 @@ readonly TG_CONFIG_FILE="$CFG/telegram.json"
 # 初始化 TG 配置
 init_tg_config() {
     [[ -f "$TG_CONFIG_FILE" ]] && return 0
-    echo '{"enabled":false,"bot_token":"","chat_id":"","notify_quota_percent":80,"notify_daily":false}' > "$TG_CONFIG_FILE"
+    echo '{"enabled":false,"bot_token":"","chat_id":"","notify_quota_percent":80,"notify_daily":false,"server_name":""}' > "$TG_CONFIG_FILE"
+}
+
+# 获取 TG 模板里的服务器显示文本
+get_tg_server_display() {
+    local server_name=$(tg_get_config "server_name")
+    local server_ip=$(get_ipv4)
+    [[ -z "$server_ip" ]] && server_ip=$(get_ipv6)
+    [[ -z "$server_ip" ]] && server_ip=$(hostname 2>/dev/null || echo "unknown")
+
+    if [[ -n "$server_name" ]]; then
+        printf '🔗 服务器: `%s`\n🌐 IP: `%s`' "$server_name" "$server_ip"
+    else
+        printf '🖥 服务器: `%s`' "$server_ip"
+    fi
 }
 
 # 获取 TG 配置
@@ -1616,11 +1636,11 @@ tg_send_message() {
 # 发送流量告警
 tg_send_quota_alert() {
     local user="$1" proto="$2" used="$3" quota="$4" percent="$5"
-    local server_ip=$(get_ipv4)
+    local server_display=$(get_tg_server_display)
     
     local message="⚠️ *流量告警*
 
-服务器: \`${server_ip}\`
+${server_display}
 协议: ${proto}
 用户: ${user}
 已用: $(format_bytes $used)
@@ -1633,11 +1653,11 @@ tg_send_quota_alert() {
 # 发送超限通知
 tg_send_over_quota() {
     local user="$1" proto="$2" used="$3" quota="$4"
-    local server_ip=$(get_ipv4)
+    local server_display=$(get_tg_server_display)
     
     local message="🚫 *流量超限*
 
-服务器: \`${server_ip}\`
+${server_display}
 协议: ${proto}
 用户: ${user}
 已用: $(format_bytes $used)
@@ -1652,11 +1672,10 @@ tg_send_over_quota() {
 # 注意: 此函数由 check_daily_report() 调用，而 check_daily_report() 由 sync_all_user_traffic() 调用
 # 因此不能在此函数内再次调用 sync_all_user_traffic()，否则会导致无限递归
 tg_send_daily_report() {
-    local server_ip=$(get_ipv4)
-    [[ -z "$server_ip" ]] && server_ip=$(get_ipv6)
+    local server_display=$(get_tg_server_display)
     
     local report="📊 *每日流量报告*
-服务器: \`${server_ip}\`
+${server_display}
 时间: $(date '+%Y-%m-%d %H:%M')
 ━━━━━━━━━━━━━━━━━━━━"
     
@@ -1763,6 +1782,9 @@ check_daily_report() {
 
 readonly XRAY_API_PORT=10085
 readonly TRAFFIC_INTERVAL_FILE="$CFG/traffic_interval"
+readonly TRAFFIC_MONTHLY_RESET_ENABLED_FILE="$CFG/traffic_monthly_reset_enabled"
+readonly TRAFFIC_MONTHLY_RESET_DAY_FILE="$CFG/traffic_monthly_reset_day"
+readonly TRAFFIC_MONTHLY_RESET_LAST_FILE="$CFG/traffic_monthly_reset_last"
 
 # 查询 Xray Stats API
 # 用法: xray_api_query "user>>>user1@vless>>>traffic>>>downlink"
@@ -1779,6 +1801,154 @@ xray_api_query() {
     [[ -n "$pattern" ]] && cmd+=" -pattern \"$pattern\""
     
     eval "$cmd" 2>/dev/null
+}
+
+# 查询 Sing-box V2Ray Stats API（通过本地 gRPC helper）
+# 用法: singbox_api_query "user>>>user1>>>traffic>>>downlink" [reset]
+singbox_api_query() {
+    local pattern="$1"
+    local reset="${2:-false}"
+    local helper="/usr/local/bin/singbox-v2ray-client"
+
+    [[ -x "$helper" ]] || return 1
+
+    if [[ "$reset" == "true" ]]; then
+        "$helper" "127.0.0.1:${SINGBOX_V2RAY_API_PORT}" "$pattern" reset 2>/dev/null
+    else
+        "$helper" "127.0.0.1:${SINGBOX_V2RAY_API_PORT}" "$pattern" 2>/dev/null
+    fi
+}
+
+singbox_stats_available() {
+    command -v sing-box &>/dev/null || return 1
+    [[ -x /usr/local/bin/singbox-v2ray-client ]] || return 1
+    sing-box version 2>/dev/null | grep -q 'with_v2ray_api' || return 1
+    return 0
+}
+
+# 确保 Sing-box 协议的默认用户落入 users[]，便于统计 / 限额 / 到期统一处理
+_ensure_singbox_default_users() {
+    [[ ! -f "$DB_FILE" ]] && return 0
+    local today
+    today=$(date +%F)
+
+    python3 - "$DB_FILE" "$today" <<'PY'
+import json, sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+today = sys.argv[2]
+
+data = json.loads(path.read_text())
+changed = [False]
+singbox = data.get('singbox') or {}
+
+for proto in ('hy2', 'tuic', 'anytls'):
+    cfg = singbox.get(proto)
+    if cfg is None:
+        continue
+
+    def default_secret(obj):
+        if proto == 'tuic':
+            return obj.get('uuid') or ''
+        return obj.get('password') or obj.get('username') or obj.get('uuid') or ''
+
+    def normalize_obj(obj):
+        if not isinstance(obj, dict):
+            return obj
+
+        secret = default_secret(obj)
+        if not secret:
+            return obj
+
+        users = obj.get('users')
+        if not isinstance(users, list):
+            users = []
+
+        default_user = None
+        for user in users:
+            if isinstance(user, dict) and user.get('name') == 'default':
+                default_user = user
+                break
+
+        if default_user is None:
+            users.insert(0, {
+                'name': 'default',
+                'uuid': secret,
+                'quota': 0,
+                'used': 0,
+                'enabled': True,
+                'created': today,
+                'expire_date': ''
+            })
+            obj['users'] = users
+            changed[0] = True
+        else:
+            if not default_user.get('uuid'):
+                default_user['uuid'] = secret
+                changed[0] = True
+            if 'quota' not in default_user:
+                default_user['quota'] = 0
+                changed[0] = True
+            if 'used' not in default_user:
+                default_user['used'] = 0
+                changed[0] = True
+            if 'enabled' not in default_user:
+                default_user['enabled'] = True
+                changed[0] = True
+            if 'created' not in default_user or not default_user.get('created'):
+                default_user['created'] = today
+                changed[0] = True
+            if 'expire_date' not in default_user:
+                default_user['expire_date'] = ''
+                changed[0] = True
+            obj['users'] = users
+
+        return obj
+
+    if isinstance(cfg, list):
+        singbox[proto] = [normalize_obj(item) for item in cfg]
+    else:
+        singbox[proto] = normalize_obj(cfg)
+
+if changed[0]:
+    data['singbox'] = singbox
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2))
+PY
+}
+
+# 生成 Sing-box 用户的内部统计键，避免不同协议同名用户（如 default）互相撞统计
+_singbox_stat_key_for_user() {
+    local proto="$1" name="$2"
+    printf '%s-%s' "$proto" "$name"
+}
+
+# 获取 Sing-box 协议的“展示用户名 -> stats 用户键”映射
+# 输出格式: name|stat_key
+_get_singbox_stat_user_mappings() {
+    local proto="$1"
+    [[ ! -f "$DB_FILE" ]] && return 1
+
+    jq -r --arg p "$proto" '
+        .singbox[$p] as $cfg |
+        def stat_key($name): ($p + "-" + $name);
+        def to_items($obj):
+            if ($obj == null) then []
+            elif (($obj.users // []) | length) > 0 then
+                [ $obj.users[] | select((.name // "") != "") | {name: .name, stat: stat_key(.name)} ]
+            elif ($obj.uuid != null or $obj.password != null or $obj.username != null) then
+                [{name: "default", stat: stat_key("default")}]
+            else
+                []
+            end;
+        if $cfg == null then
+            []
+        elif ($cfg | type) == "array" then
+            [ $cfg[] | to_items(.)[] ] | unique_by(.name + "|" + .stat) | .[] | "\(.name)|\(.stat)"
+        else
+            to_items($cfg) | unique_by(.name + "|" + .stat) | .[] | "\(.name)|\(.stat)"
+        end
+    ' "$DB_FILE" 2>/dev/null
 }
 
 # 获取用户流量 (上行+下行)
@@ -1821,33 +1991,49 @@ sync_all_user_traffic() {
     local reset="${1:-true}"  # 默认重置计数器
     
     [[ ! -f "$DB_FILE" ]] && return 1
+    _ensure_singbox_default_users
     
-    # 检查是否需要发送每日报告 (在流量统计之前调用，确保不会被 early return 跳过)
+    # 月重置（仅重置数据库累计值，不影响实时计数器）
+    check_monthly_traffic_reset
+    
+    # 检查是否需要发送每日报告
     check_daily_report
-    
-    # 检查 Xray 是否运行 (使用兼容 Alpine 的 _pgrep)
-    if ! _pgrep xray; then
-        return 0  # 改为 return 0，因为每日报告已处理，不算错误
+
+    local has_xray=false
+    local has_singbox=false
+    _pgrep xray && has_xray=true
+    _pgrep sing-box && has_singbox=true
+
+    if [[ "$has_xray" == "false" && "$has_singbox" == "false" ]]; then
+        return 0
     fi
     
     # 使用临时文件存储 API 结果，避免内存问题
     local tmp_stats=$(mktemp)
     trap "rm -f '$tmp_stats'" RETURN
+    : > "$tmp_stats"
     
     # 一次性获取所有流量统计（带重置选项）
     local reset_flag=""
     [[ "$reset" == "true" ]] && reset_flag="-reset"
     
-    if ! xray api statsquery --server=127.0.0.1:${XRAY_API_PORT} $reset_flag 2>/dev/null | \
-         jq -r '.stat[]? | "\(.name // .Name) \(.value // .Value // 0)"' > "$tmp_stats" 2>/dev/null; then
-        rm -f "$tmp_stats"
-        return 1
+    if [[ "$has_xray" == "true" ]]; then
+        xray api statsquery --server=127.0.0.1:${XRAY_API_PORT} $reset_flag 2>/dev/null | \
+            jq -r '.stat[]? | "\(.name // .Name) \(.value // .Value // 0)"' >> "$tmp_stats" 2>/dev/null || true
+    fi
+
+    if [[ "$has_singbox" == "true" ]] && singbox_stats_available; then
+        if [[ "$reset" == "true" ]]; then
+            singbox_api_query "user>>>" reset >> "$tmp_stats" 2>/dev/null || true
+        else
+            singbox_api_query "user>>>" >> "$tmp_stats" 2>/dev/null || true
+        fi
     fi
     
     [[ ! -s "$tmp_stats" ]] && { rm -f "$tmp_stats"; return 0; }
     
     local updated=0
-    local need_reload=false  # 标记是否需要重载配置
+    local need_reload=false  # 标记是否需要重载 Xray 配置
     local notify_percent=$(tg_get_config "notify_quota_percent")
     notify_percent=${notify_percent:-80}
     
@@ -1861,8 +2047,6 @@ sync_all_user_traffic() {
         
         for user in $users; do
             local email="${user}@${proto}"
-            
-            # 从临时文件中提取流量值
             local uplink=$(grep -F "user>>>${email}>>>traffic>>>uplink " "$tmp_stats" 2>/dev/null | awk '{print $NF}')
             local downlink=$(grep -F "user>>>${email}>>>traffic>>>downlink " "$tmp_stats" 2>/dev/null | awk '{print $NF}')
             
@@ -1871,37 +2055,25 @@ sync_all_user_traffic() {
             local traffic=$((uplink + downlink))
             
             if [[ "$traffic" -gt 0 ]]; then
-                # 更新数据库
                 db_update_user_traffic "xray" "$proto" "$user" "$traffic"
                 ((updated++))
                 
-                # 检查配额
                 local quota=$(db_get_user_field "xray" "$proto" "$user" "quota")
                 local used=$(db_get_user_field "xray" "$proto" "$user" "used")
                 
                 if [[ "$quota" -gt 0 ]]; then
                     local percent=$((used * 100 / quota))
-                    
-                    # 超限检查 (只处理一次)
                     if [[ "$used" -ge "$quota" ]]; then
-                        # 检查是否已发送过超限通知
                         local exceeded_notified=$(db_get_user_alert_state "xray" "$proto" "$user" "quota_exceeded_notified")
                         if [[ "$exceeded_notified" != "true" ]]; then
-                            # 禁用用户
                             db_set_user_enabled "xray" "$proto" "$user" "false"
-                            # 标记已发送超限通知
                             db_set_user_alert_state "xray" "$proto" "$user" "quota_exceeded_notified" "true"
-                            # 发送通知
                             tg_send_over_quota "$user" "$proto" "$used" "$quota"
-                            # 标记需要重载配置
                             need_reload=true
                         fi
                     elif [[ "$percent" -ge "$notify_percent" ]]; then
-                        # 告警检查：只在跨越新的阈值档位时发送
                         local last_alert=$(db_get_user_alert_state "xray" "$proto" "$user" "last_alert_percent")
                         last_alert=${last_alert:-0}
-                        
-                        # 找到当前应该告警的最高档位
                         local should_alert=false
                         local current_threshold=0
                         for threshold in "${alert_thresholds[@]}"; do
@@ -1910,9 +2082,7 @@ sync_all_user_traffic() {
                                 current_threshold=$threshold
                             fi
                         done
-                        
                         if [[ "$should_alert" == "true" ]]; then
-                            # 发送告警并更新记录
                             tg_send_quota_alert "$user" "$proto" "$used" "$quota" "$percent"
                             db_set_user_alert_state "xray" "$proto" "$user" "last_alert_percent" "$current_threshold"
                         fi
@@ -1921,6 +2091,61 @@ sync_all_user_traffic() {
             fi
         done
     done
+
+    # 遍历所有 Sing-box 协议（当前已接入 HY2 / TUIC / AnyTLS 用户级统计）
+    if [[ "$has_singbox" == "true" ]] && singbox_stats_available; then
+        for proto in hy2 tuic anytls; do
+            db_exists "singbox" "$proto" || continue
+            local mappings=$(_get_singbox_stat_user_mappings "$proto")
+            [[ -z "$mappings" ]] && continue
+
+            while IFS='|' read -r user stat_key; do
+                [[ -z "$user" || -z "$stat_key" ]] && continue
+
+                local uplink=$(grep -F "user>>>${stat_key}>>>traffic>>>uplink " "$tmp_stats" 2>/dev/null | awk '{print $NF}')
+                local downlink=$(grep -F "user>>>${stat_key}>>>traffic>>>downlink " "$tmp_stats" 2>/dev/null | awk '{print $NF}')
+
+                uplink=${uplink:-0}
+                downlink=${downlink:-0}
+                local traffic=$((uplink + downlink))
+
+                if [[ "$traffic" -gt 0 ]]; then
+                    db_update_user_traffic "singbox" "$proto" "$user" "$traffic"
+                    ((updated++))
+
+                    local quota=$(db_get_user_field "singbox" "$proto" "$user" "quota")
+                    local used=$(db_get_user_field "singbox" "$proto" "$user" "used")
+
+                    if [[ "$quota" -gt 0 ]]; then
+                        local percent=$((used * 100 / quota))
+                        if [[ "$used" -ge "$quota" ]]; then
+                            local exceeded_notified=$(db_get_user_alert_state "singbox" "$proto" "$user" "quota_exceeded_notified")
+                            if [[ "$exceeded_notified" != "true" ]]; then
+                                db_set_user_enabled "singbox" "$proto" "$user" "false"
+                                db_set_user_alert_state "singbox" "$proto" "$user" "quota_exceeded_notified" "true"
+                                tg_send_over_quota "$user" "$proto" "$used" "$quota"
+                            fi
+                        elif [[ "$percent" -ge "$notify_percent" ]]; then
+                            local last_alert=$(db_get_user_alert_state "singbox" "$proto" "$user" "last_alert_percent")
+                            last_alert=${last_alert:-0}
+                            local should_alert=false
+                            local current_threshold=0
+                            for threshold in "${alert_thresholds[@]}"; do
+                                if [[ "$percent" -ge "$threshold" && "$last_alert" -lt "$threshold" ]]; then
+                                    should_alert=true
+                                    current_threshold=$threshold
+                                fi
+                            done
+                            if [[ "$should_alert" == "true" ]]; then
+                                tg_send_quota_alert "$user" "$proto" "$used" "$quota" "$percent"
+                                db_set_user_alert_state "singbox" "$proto" "$user" "last_alert_percent" "$current_threshold"
+                            fi
+                        fi
+                    fi
+                fi
+            done <<< "$mappings"
+        done
+    fi
     
     rm -f "$tmp_stats"
     
@@ -1930,56 +2155,79 @@ sync_all_user_traffic() {
         svc restart vless-reality 2>/dev/null
     fi
     
-    # 注：Sing-box 协议 (hy2/tuic) 暂不支持流量统计（需要完整版编译）
-    
     return 0
 }
 
 # 获取所有用户流量统计 (用于显示)
 # 输出格式: proto|user|uplink|downlink|total
-# 注：仅支持 Xray 协议，Sing-box (hy2/tuic) 需要完整版支持
+# 支持 Xray + Sing-box（当前已接入 HY2 / TUIC / AnyTLS 的用户级统计）
 get_all_traffic_stats() {
     [[ ! -f "$DB_FILE" ]] && return 1
-    
+    _ensure_singbox_default_users
+
     # 使用临时文件存储，避免大变量导致内存问题
     local tmp_stats=$(mktemp)
     trap "rm -f '$tmp_stats'" RETURN
-    
-    local has_data=false
-    
+    : > "$tmp_stats"
+
     # === Xray 流量统计 ===
     if _pgrep xray &>/dev/null; then
-        if xray api statsquery --server=127.0.0.1:${XRAY_API_PORT} 2>/dev/null | \
-             jq -r '.stat[]? | "\(.name // .Name) \(.value // .Value // 0)"' > "$tmp_stats" 2>/dev/null; then
-            
-            if [[ -s "$tmp_stats" ]]; then
-                # 遍历 Xray 用户
-                for proto in $(db_list_protocols "xray"); do
-                    local users=$(db_list_users "xray" "$proto")
-                    [[ -z "$users" ]] && continue
-                    
-                    for user in $users; do
-                        local email="${user}@${proto}"
-                        
-                        local uplink=$(grep -F "user>>>${email}>>>traffic>>>uplink " "$tmp_stats" 2>/dev/null | awk '{print $NF}')
-                        local downlink=$(grep -F "user>>>${email}>>>traffic>>>downlink " "$tmp_stats" 2>/dev/null | awk '{print $NF}')
-                        
-                        uplink=${uplink:-0}
-                        downlink=${downlink:-0}
-                        
-                        local total=$((uplink + downlink))
-                        if [[ "$total" -gt 0 ]]; then
-                            echo "${proto}|${user}|${uplink}|${downlink}|${total}"
-                            has_data=true
-                        fi
-                    done
-                done
-            fi
-        fi
+        xray api statsquery --server=127.0.0.1:${XRAY_API_PORT} 2>/dev/null | \
+            jq -r '.stat[]? | "\(.name // .Name) \(.value // .Value // 0)"' >> "$tmp_stats" 2>/dev/null || true
     fi
-    
-    # 注：Sing-box 协议 (hy2/tuic) 暂不支持实时流量统计（需要完整版编译）
-    
+
+    # === Sing-box 流量统计 ===
+    if _pgrep sing-box &>/dev/null && singbox_stats_available; then
+        singbox_api_query "user>>>" >> "$tmp_stats" 2>/dev/null || true
+    fi
+
+    [[ ! -s "$tmp_stats" ]] && { rm -f "$tmp_stats"; return 0; }
+
+    # 遍历 Xray 用户
+    for proto in $(db_list_protocols "xray"); do
+        local users=$(db_list_users "xray" "$proto")
+        [[ -z "$users" ]] && continue
+
+        for user in $users; do
+            local email="${user}@${proto}"
+
+            local uplink=$(grep -F "user>>>${email}>>>traffic>>>uplink " "$tmp_stats" 2>/dev/null | awk '{print $NF}')
+            local downlink=$(grep -F "user>>>${email}>>>traffic>>>downlink " "$tmp_stats" 2>/dev/null | awk '{print $NF}')
+
+            uplink=${uplink:-0}
+            downlink=${downlink:-0}
+
+            local total=$((uplink + downlink))
+            if [[ "$total" -gt 0 ]]; then
+                echo "${proto}|${user}|${uplink}|${downlink}|${total}"
+            fi
+        done
+    done
+
+    # 遍历 Sing-box 用户（HY2 / TUIC / AnyTLS）
+    if _pgrep sing-box &>/dev/null && singbox_stats_available; then
+        for proto in hy2 tuic anytls; do
+            db_exists "singbox" "$proto" || continue
+            local mappings=$(_get_singbox_stat_user_mappings "$proto")
+            [[ -z "$mappings" ]] && continue
+
+            while IFS='|' read -r user stat_key; do
+                [[ -z "$user" || -z "$stat_key" ]] && continue
+
+                local uplink=$(grep -F "user>>>${stat_key}>>>traffic>>>uplink " "$tmp_stats" 2>/dev/null | awk '{print $NF}')
+                local downlink=$(grep -F "user>>>${stat_key}>>>traffic>>>downlink " "$tmp_stats" 2>/dev/null | awk '{print $NF}')
+
+                uplink=${uplink:-0}
+                downlink=${downlink:-0}
+
+                local total=$((uplink + downlink))
+                if [[ "$total" -gt 0 ]]; then
+                    echo "${proto}|${user}|${uplink}|${downlink}|${total}"
+                fi
+            done <<< "$mappings"
+        done
+    fi
+
     rm -f "$tmp_stats"
 }
 
@@ -1998,28 +2246,138 @@ set_traffic_interval() {
     echo "$interval" > "$TRAFFIC_INTERVAL_FILE"
 }
 
+get_bash_interpreter() {
+    local bash_path=""
+    for candidate in "$(command -v bash 2>/dev/null)" /bin/bash /usr/bin/bash /usr/local/bin/bash; do
+        [[ -n "$candidate" && -x "$candidate" ]] || continue
+        bash_path="$candidate"
+        break
+    done
+    echo "$bash_path"
+}
+
+build_cron_command() {
+    local schedule="$1" script_path="$2" subcommand="$3" log_file="$4"
+    local bash_path
+    bash_path=$(get_bash_interpreter)
+    [[ -z "$bash_path" ]] && return 1
+    printf '%s %q %q %s >> %q 2>&1' "$schedule" "$bash_path" "$script_path" "$subcommand" "$log_file"
+}
+
+install_cron_entry() {
+    local tag="$1" cron_cmd="$2"
+    command -v crontab >/dev/null 2>&1 || { _err "crontab 不存在，无法写入定时任务"; return 1; }
+    [[ -n "$cron_cmd" ]] || { _err "定时任务命令为空"; return 1; }
+
+    local current
+    current=$(crontab -l 2>/dev/null || true)
+    if printf '%s\n' "$current" | grep -q "$tag"; then
+        current=$(printf '%s\n' "$current" | grep -v "$tag")
+    fi
+    printf '%s\n%s\n' "$current" "$cron_cmd" | awk 'NF' | crontab -
+}
+
+remove_cron_entry() {
+    local tag="$1"
+    command -v crontab >/dev/null 2>&1 || return 0
+    local current
+    current=$(crontab -l 2>/dev/null || true)
+    printf '%s
+' "$current" | grep -v "$tag" | crontab -
+}
+
 # 创建流量统计定时任务
 setup_traffic_cron() {
     local interval="${1:-$(get_traffic_interval)}"
-    local script_path=$(readlink -f "$0")
-    local cron_cmd="*/$interval * * * * $script_path --sync-traffic >/dev/null 2>&1"
-    
-    # 先移除旧的定时任务
-    crontab -l 2>/dev/null | grep -v "sync-traffic" | crontab - 2>/dev/null
-    
-    # 添加新的定时任务
-    (crontab -l 2>/dev/null; echo "$cron_cmd") | crontab -
-    
-    # 保存间隔设置
-    set_traffic_interval "$interval"
-    
-    _ok "已添加流量统计定时任务 (每${interval}分钟)"
+    local script_path="/usr/local/bin/vless-server.sh"
+    [[ -x "$script_path" ]] || script_path=$(readlink -f "$0")
+    local bash_path log_file cron_cmd
+    bash_path=$(get_bash_interpreter)
+    [[ -x "$script_path" ]] || { _err "脚本不存在或不可执行: $script_path"; return 1; }
+    [[ -n "$bash_path" ]] || { _err "未找到 bash，无法写入流量统计定时任务"; return 1; }
+    log_file="$CFG/traffic-sync.log"
+    cron_cmd="$(build_cron_command "*/$interval * * * *" "$script_path" "--sync-traffic" "$log_file") # sync-traffic"
+
+    # 确保 cron 服务已启动
+    if [[ "$DISTRO" == "alpine" ]]; then
+        rc-service cronie start >/dev/null 2>&1 || rc-service crond start >/dev/null 2>&1 || true
+        rc-update add cronie default >/dev/null 2>&1 || rc-update add crond default >/dev/null 2>&1 || true
+    elif command -v systemctl >/dev/null 2>&1; then
+        systemctl enable cron >/dev/null 2>&1 || systemctl enable crond >/dev/null 2>&1 || true
+        systemctl start cron >/dev/null 2>&1 || systemctl start crond >/dev/null 2>&1 || true
+    fi
+
+    if install_cron_entry "sync-traffic" "$cron_cmd"; then
+        set_traffic_interval "$interval"
+        _ok "已添加流量统计定时任务 (每${interval}分钟)"
+        echo -e "  ${D}日志: $log_file${NC}"
+        echo -e "  ${D}解释器: $bash_path${NC}"
+    else
+        _err "流量统计定时任务写入失败"
+        echo -e "  ${Y}提示: 可手动执行 ${C}$script_path --sync-traffic${NC} 查看报错${NC}"
+        return 1
+    fi
 }
 
 # 移除流量统计定时任务
 remove_traffic_cron() {
-    crontab -l 2>/dev/null | grep -v "sync-traffic" | crontab -
+    remove_cron_entry "sync-traffic"
     _ok "已移除流量统计定时任务"
+}
+
+get_traffic_monthly_reset_enabled() {
+    [[ -f "$TRAFFIC_MONTHLY_RESET_ENABLED_FILE" ]] && cat "$TRAFFIC_MONTHLY_RESET_ENABLED_FILE" || echo "false"
+}
+
+set_traffic_monthly_reset_enabled() {
+    echo "$1" > "$TRAFFIC_MONTHLY_RESET_ENABLED_FILE"
+}
+
+get_traffic_monthly_reset_day() {
+    [[ -f "$TRAFFIC_MONTHLY_RESET_DAY_FILE" ]] && cat "$TRAFFIC_MONTHLY_RESET_DAY_FILE" || echo "1"
+}
+
+set_traffic_monthly_reset_day() {
+    echo "$1" > "$TRAFFIC_MONTHLY_RESET_DAY_FILE"
+}
+
+reset_monthly_user_traffic() {
+    [[ ! -f "$DB_FILE" ]] && return 0
+    local month_key
+    month_key=$(date +%Y-%m)
+    echo "$month_key" > "$TRAFFIC_MONTHLY_RESET_LAST_FILE"
+
+    local tmp=$(mktemp)
+    jq '
+      if .xray then
+        .xray |= with_entries(
+          .value |= (
+            if type == "array" then
+              map(if .users then .users |= map(.used = 0 | .enabled = true | del(.alert.last_alert_percent, .alert.quota_exceeded_notified)) else . end)
+            else
+              if .users then .users |= map(.used = 0 | .enabled = true | del(.alert.last_alert_percent, .alert.quota_exceeded_notified)) else . end
+            end
+          )
+        )
+      else . end
+    ' "$DB_FILE" > "$tmp" && mv "$tmp" "$DB_FILE"
+    _ok "已按月重置 Xray 用户流量"
+}
+
+check_monthly_traffic_reset() {
+    [[ "$(get_traffic_monthly_reset_enabled)" != "true" ]] && return 0
+    local day today month_key last_key
+    day=$(get_traffic_monthly_reset_day)
+    today=$(date +%d | sed 's/^0*//')
+    month_key=$(date +%Y-%m)
+    last_key=""
+    [[ -f "$TRAFFIC_MONTHLY_RESET_LAST_FILE" ]] && last_key=$(cat "$TRAFFIC_MONTHLY_RESET_LAST_FILE")
+    [[ -z "$day" ]] && day=1
+    (( day < 1 )) && day=1
+    (( day > 28 )) && day=28
+    if [[ "$today" -ge "$day" && "$last_key" != "$month_key" ]]; then
+        reset_monthly_user_traffic
+    fi
 }
 
 
@@ -2463,11 +2821,12 @@ fi
 #═══════════════════════════════════════════════════════════════════════════════
 
 # 协议分类定义 (重构: Sing-box 接管独立协议)
+SINGBOX_V2RAY_API_PORT="10086"
 XRAY_PROTOCOLS="vless vless-xhttp vless-xhttp-cdn vless-ws vless-ws-notls vmess-ws vless-vision trojan trojan-ws socks ss2022 ss-legacy"
 # Sing-box 管理的协议 (原独立协议，现统一由 Sing-box 处理)
-SINGBOX_PROTOCOLS="hy2 tuic"
+SINGBOX_PROTOCOLS="hy2 tuic anytls"
 # 仍需独立进程的协议 (Snell 等闭源协议)
-STANDALONE_PROTOCOLS="snell snell-v5 snell-shadowtls snell-v5-shadowtls ss2022-shadowtls anytls naive"
+STANDALONE_PROTOCOLS="snell snell-v5 snell-shadowtls snell-v5-shadowtls ss2022-shadowtls naive"
 
 #═══════════════════════════════════════════════════════════════════════════════
 #  表驱动元数据 (协议/服务/进程/启动命令)
@@ -2487,6 +2846,7 @@ done
 # Sing-box 统一服务：hy2/tuic 由 vless-singbox 统一管理
 PROTO_SVC[hy2]="vless-singbox";  PROTO_BIN[hy2]="sing-box"; PROTO_KIND[hy2]="singbox"
 PROTO_SVC[tuic]="vless-singbox"; PROTO_BIN[tuic]="sing-box"; PROTO_KIND[tuic]="singbox"
+PROTO_SVC[anytls]="vless-singbox"; PROTO_BIN[anytls]="sing-box"; PROTO_KIND[anytls]="singbox"
 
 # 独立协议 (Snell 等闭源协议仍需独立进程)
 PROTO_SVC[snell]="vless-snell";     PROTO_EXEC[snell]="/usr/local/bin/snell-server -c $CFG/snell.conf";        PROTO_BIN[snell]="snell-server"; PROTO_KIND[snell]="snell"
@@ -3264,6 +3624,31 @@ generate_xray_config() {
         _err "没有任何协议配置成功生成"
         return 1
     fi
+
+    # 最终净化 Xray 不支持的 tracker/geosite 规则（仅影响 Xray；Sing-box 保留对应限制）
+    if [[ -f "$CFG/config.json" ]]; then
+        local tmp=$(mktemp)
+        if jq '
+            if .routing and .routing.rules then
+                .routing.rules = [
+                    .routing.rules[] |
+                    select(
+                        (.domain == null) or
+                        (
+                            (.domain | index("geosite:tracker")) == null and
+                            (.domain | index("geosite:public-tracker")) == null and
+                            (.domain | index("geosite:private-tracker")) == null and
+                            (.domain | index("geosite:category-pt")) == null
+                        )
+                    )
+                ]
+            else . end
+        ' "$CFG/config.json" > "$tmp" 2>/dev/null; then
+            mv "$tmp" "$CFG/config.json"
+        else
+            rm -f "$tmp"
+        fi
+    fi
     
     # 验证最终配置文件的 JSON 格式
     if ! jq empty "$CFG/config.json" 2>/dev/null; then
@@ -3420,45 +3805,74 @@ add_xray_inbound_v2() {
     
     case "$base_protocol" in
         vless)
-            # VLESS+Reality - 使用 jq 安全构建 (支持 WS 回落)
-            # 获取完整的用户列表（包含子用户和 email，用于流量统计）
-            local clients=$(gen_xray_vless_clients "$base_protocol" "xtls-rprx-vision" "$port")
-            [[ -z "$clients" || "$clients" == "[]" ]] && clients="[{\"id\":\"$uuid\",\"email\":\"default@${base_protocol}\",\"flow\":\"xtls-rprx-vision\"}]"
-            
-            jq -n \
-                --argjson port "$port" \
-                --argjson clients "$clients" \
-                --arg sni "$sni" \
-                --arg private_key "$private_key" \
-                --arg short_id "$short_id" \
-                --arg dest "$reality_dest" \
-                --arg listen_addr "$listen_addr" \
-                --arg tag "$inbound_tag" \
-                --argjson fallbacks "$fallbacks" \
-            '{
-                port: $port,
-                listen: $listen_addr,
-                protocol: "vless",
-                settings: {
-                    clients: $clients,
-                    decryption: "none",
-                    fallbacks: $fallbacks
-                },
-                streamSettings: {
-                    network: "tcp",
-                    security: "reality",
-                    realitySettings: {
-                        show: false,
-                        dest: $dest,
-                        xver: 0,
-                        serverNames: [$sni],
-                        privateKey: $private_key,
-                        shortIds: [$short_id]
-                    }
-                },
-                sniffing: {enabled: true, destOverride: ["http","tls"]},
-                tag: $tag
-            }' > "$tmp_inbound"
+            local security_mode=$(echo "$cfg" | jq -r '.security_mode // "reality"')
+            if [[ "$security_mode" == "encryption" ]]; then
+                local decryption=$(echo "$cfg" | jq -r '.decryption // "none"')
+                local clients=$(gen_xray_vless_clients "$base_protocol" "" "$port")
+                [[ -z "$clients" || "$clients" == "[]" ]] && clients="[{\"id\":\"$uuid\",\"email\":\"default@${base_protocol}\"}]"
+
+                jq -n \
+                    --argjson port "$port" \
+                    --argjson clients "$clients" \
+                    --arg decryption "$decryption" \
+                    --arg listen_addr "$listen_addr" \
+                    --arg tag "$inbound_tag" \
+                '{
+                    port: $port,
+                    listen: $listen_addr,
+                    protocol: "vless",
+                    settings: {
+                        clients: $clients,
+                        decryption: $decryption
+                    },
+                    streamSettings: {
+                        network: "tcp",
+                        security: "none"
+                    },
+                    sniffing: {enabled: true, destOverride: ["http","tls"]},
+                    tag: $tag
+                }' > "$tmp_inbound"
+            else
+                # VLESS+Reality - 使用 jq 安全构建 (支持 WS 回落)
+                # 获取完整的用户列表（包含子用户和 email，用于流量统计）
+                local clients=$(gen_xray_vless_clients "$base_protocol" "xtls-rprx-vision" "$port")
+                [[ -z "$clients" || "$clients" == "[]" ]] && clients="[{\"id\":\"$uuid\",\"email\":\"default@${base_protocol}\",\"flow\":\"xtls-rprx-vision\"}]"
+                
+                jq -n \
+                    --argjson port "$port" \
+                    --argjson clients "$clients" \
+                    --arg sni "$sni" \
+                    --arg private_key "$private_key" \
+                    --arg short_id "$short_id" \
+                    --arg dest "$reality_dest" \
+                    --arg listen_addr "$listen_addr" \
+                    --arg tag "$inbound_tag" \
+                    --argjson fallbacks "$fallbacks" \
+                '{
+                    port: $port,
+                    listen: $listen_addr,
+                    protocol: "vless",
+                    settings: {
+                        clients: $clients,
+                        decryption: "none",
+                        fallbacks: $fallbacks
+                    },
+                    streamSettings: {
+                        network: "tcp",
+                        security: "reality",
+                        realitySettings: {
+                            show: false,
+                            dest: $dest,
+                            xver: 0,
+                            serverNames: [$sni],
+                            privateKey: $private_key,
+                            shortIds: [$short_id]
+                        }
+                    },
+                    sniffing: {enabled: true, destOverride: ["http","tls"]},
+                    tag: $tag
+                }' > "$tmp_inbound"
+            fi
             ;;
         vless-vision)
             # VLESS-Vision - 使用 jq 安全构建
@@ -4068,10 +4482,30 @@ check_dependencies() {
         case "$DISTRO" in
             alpine)
                 apk update >/dev/null 2>&1
-                apk add --no-cache curl jq openssl coreutils ca-certificates gawk libqrencode-tools cronie >/dev/null 2>&1
-                # 启动 crond 服务
-                rc-service crond start >/dev/null 2>&1
-                rc-update add crond default >/dev/null 2>&1
+                # Alpine 上 qrencode 命令来自 libqrencode-tools，不是 qrencode 包名
+                local alpine_base_pkgs="curl jq openssl coreutils ca-certificates gawk libqrencode-tools"
+                apk add --no-cache $alpine_base_pkgs >/dev/null 2>&1 || {
+                    _err "Alpine 基础依赖安装失败"
+                    _warn "请手动执行: apk add --no-cache $alpine_base_pkgs"
+                    return 1
+                }
+
+                # Alpine 的 cron 实现可能是 dcron 或 cronie，二者互斥
+                if ! command -v crontab &>/dev/null; then
+                    if apk add --no-cache cronie >/dev/null 2>&1; then
+                        :
+                    elif apk add --no-cache dcron >/dev/null 2>&1; then
+                        :
+                    else
+                        _err "Alpine cron 依赖安装失败"
+                        _warn "请手动执行: apk add --no-cache cronie 或 apk add --no-cache dcron"
+                        return 1
+                    fi
+                fi
+
+                # Alpine 可能是 busybox crond，也可能是 cronie 服务，两个都兼容一下
+                rc-service cronie start >/dev/null 2>&1 || rc-service crond start >/dev/null 2>&1 || true
+                rc-update add cronie default >/dev/null 2>&1 || rc-update add crond default >/dev/null 2>&1 || true
                 ;;
             centos)
                 yum install -y curl jq openssl ca-certificates qrencode cronie >/dev/null 2>&1
@@ -5264,6 +5698,13 @@ gen_vless_link() {
     local ip_suffix=$(get_ip_suffix "$ip")
     local name="${country:+${country}-}VLESS+Reality${ip_suffix:+-${ip_suffix}}"
     printf '%s\n' "vless://${uuid}@${ip}:${port}?encryption=none&security=reality&type=tcp&sni=${sni}&fp=chrome&pbk=${pbk}&sid=${sid}&flow=xtls-rprx-vision#${name}"
+}
+
+gen_vless_encryption_link() {
+    local ip="$1" port="$2" uuid="$3" encryption="$4" country="${5:-}"
+    local ip_suffix=$(get_ip_suffix "$ip")
+    local name="${country:+${country}-}VLESS+Encryption${ip_suffix:+-${ip_suffix}}"
+    printf '%s\n' "vless://${uuid}@${ip}:${port}?encryption=${encryption}&security=none&type=tcp#${name}"
 }
 
 gen_vless_xhttp_link() {
@@ -6665,12 +7106,10 @@ _download_script_to() {
 # 获取最新标签版本号（无缓存）
 _get_latest_tag_version() {
     local repo="$1"
-    local project result version
-
-    project=$(echo "$repo" | sed 's/\//%2F/g')
+    local result version
 
     result=$(curl -sL --connect-timeout 5 --max-time 10 \
-    "https://gitlab.com/api/v4/projects/${project}/repository/tags?per_page=1" 2>/dev/null)
+    "https://api.github.com/repos/${repo}/tags?per_page=1" 2>/dev/null)
 
     [[ -z "$result" ]] && return 1
 
@@ -6678,6 +7117,13 @@ _get_latest_tag_version() {
 
     [[ -z "$version" ]] && return 1
 
+    echo "$version"
+}
+
+_get_latest_script_version_from_raw() {
+    local version
+    version=$(curl -sL --connect-timeout 5 --max-time 10 "$SCRIPT_RAW_URL" 2>/dev/null | sed -n 's/^readonly VERSION="\([^"]*\)"/\1/p' | head -n1)
+    [[ -z "$version" ]] && return 1
     echo "$version"
 }
 
@@ -6705,6 +7151,9 @@ _get_latest_script_version() {
     version=$(_get_latest_version "$SCRIPT_REPO" "false" "true" 2>/dev/null)
     if [[ -z "$version" ]]; then
         version=$(_get_latest_tag_version "$SCRIPT_REPO")
+    fi
+    if [[ -z "$version" ]]; then
+        version=$(_get_latest_script_version_from_raw)
     fi
     [[ -z "$version" ]] && return 1
 
@@ -8384,9 +8833,16 @@ update_core_menu() {
         _show_core_versions
         _line
         
-        _item "1" "更新 Xray"
-        _item "2" "更新 Sing-box"
-        _item "3" "更新 Snell v5"
+        local xray_label="更新 Xray"
+        local singbox_label="更新 Sing-box"
+        local snellv5_label="更新 Snell v5"
+        check_cmd xray || xray_label="安装 Xray"
+        check_cmd sing-box || singbox_label="安装 Sing-box"
+        check_cmd snell-server-v5 || snellv5_label="安装 Snell v5"
+        
+        _item "1" "$xray_label"
+        _item "2" "$singbox_label"
+        _item "3" "$snellv5_label"
         _item "4" "重新获取版本"
         _item "0" "返回"
         _line
@@ -8410,8 +8866,235 @@ update_core_menu() {
     done
 }
 
+_singbox_ruleset_path() {
+    local tag="$1"
+    echo "$CFG/ruleset/${tag}.srs"
+}
+
+_singbox_ruleset_source_path() {
+    local tag="$1"
+    echo "$CFG/ruleset-src/${tag}.json"
+}
+
+_build_singbox_geosite_ruleset() {
+    local tag="$1"
+    local source_path=$(_singbox_ruleset_source_path "$tag")
+    local output_path=$(_singbox_ruleset_path "$tag")
+    local roots=""
+
+    case "$tag" in
+        geosite-tracker) roots="category-public-tracker category-pt" ;;
+        geosite-*) roots="${tag#geosite-}" ;;
+        *) return 1 ;;
+    esac
+
+    mkdir -p "$CFG/ruleset" "$CFG/ruleset-src"
+
+    python3 - "$source_path" $roots <<'PY'
+import json, sys, urllib.request
+from pathlib import Path
+
+out_path = Path(sys.argv[1])
+roots = sys.argv[2:]
+base = 'https://raw.githubusercontent.com/v2fly/domain-list-community/master/data/{}'
+seen = set()
+full = set()
+suffix = set()
+keyword = set()
+regex = set()
+
+
+def fetch(name: str) -> str:
+    with urllib.request.urlopen(base.format(name), timeout=30) as resp:
+        return resp.read().decode('utf-8', 'ignore')
+
+
+def norm_token(token: str) -> str:
+    token = token.strip()
+    if '@' in token:
+        token = token.split('@', 1)[0].strip()
+    if ' ' in token:
+        token = token.split()[0].strip()
+    return token.strip()
+
+
+def load(name: str):
+    if not name or name in seen:
+        return
+    seen.add(name)
+    text = fetch(name)
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith('#'):
+            continue
+        if '# ' in line:
+            line = line.split('#', 1)[0].strip()
+        line = norm_token(line)
+        if not line:
+            continue
+        if line.startswith('include:'):
+            load(norm_token(line.split(':', 1)[1]))
+        elif line.startswith('full:'):
+            v = norm_token(line.split(':', 1)[1])
+            if v:
+                full.add(v)
+        elif line.startswith('regexp:'):
+            v = line.split(':', 1)[1].strip()
+            if v:
+                regex.add(v)
+        elif line.startswith('keyword:'):
+            v = norm_token(line.split(':', 1)[1])
+            if v:
+                keyword.add(v)
+        elif line.startswith('domain:'):
+            v = norm_token(line.split(':', 1)[1]).lstrip('.')
+            if v:
+                suffix.add(v)
+        elif line.startswith('exclude:'):
+            continue
+        else:
+            v = norm_token(line).lstrip('.')
+            if v:
+                suffix.add(v)
+
+for item in roots:
+    load(item)
+
+rule = {}
+if full:
+    rule['domain'] = sorted(full)
+if suffix:
+    rule['domain_suffix'] = sorted(suffix)
+if keyword:
+    rule['domain_keyword'] = sorted(keyword)
+if regex:
+    rule['domain_regex'] = sorted(regex)
+
+out = {'version': 3, 'rules': [rule] if rule else []}
+out_path.write_text(json.dumps(out, ensure_ascii=False, indent=2))
+PY
+
+    sing-box rule-set compile "$source_path" -o "$output_path" >/dev/null 2>&1
+}
+
+_build_singbox_geoip_ruleset() {
+    local tag="$1"
+    local source_path=$(_singbox_ruleset_source_path "$tag")
+    local output_path=$(_singbox_ruleset_path "$tag")
+    local name=""
+
+    case "$tag" in
+        geoip-*) name="${tag#geoip-}" ;;
+        *) return 1 ;;
+    esac
+
+    mkdir -p "$CFG/ruleset" "$CFG/ruleset-src"
+
+    python3 - "$source_path" "$name" <<'PY'
+import json, sys, urllib.request
+from pathlib import Path
+
+out_path = Path(sys.argv[1])
+name = sys.argv[2]
+urls = [
+    f'https://raw.githubusercontent.com/Loyalsoldier/geoip/release/text/{name}.txt',
+]
+text = None
+for url in urls:
+    try:
+        with urllib.request.urlopen(url, timeout=30) as resp:
+            text = resp.read().decode('utf-8', 'ignore')
+            break
+    except Exception:
+        continue
+if text is None:
+    raise SystemExit(f'failed to fetch geoip source for {name}')
+ips = []
+for raw in text.splitlines():
+    line = raw.strip()
+    if not line or line.startswith('#'):
+        continue
+    ips.append(line)
+out = {'version': 3, 'rules': [{'ip_cidr': ips}] if ips else []}
+out_path.write_text(json.dumps(out, ensure_ascii=False, indent=2))
+PY
+
+    sing-box rule-set compile "$source_path" -o "$output_path" >/dev/null 2>&1
+}
+
+_build_singbox_ruleset() {
+    local tag="$1"
+    case "$tag" in
+        geosite-*) _build_singbox_geosite_ruleset "$tag" ;;
+        geoip-*) _build_singbox_geoip_ruleset "$tag" ;;
+        *) return 1 ;;
+    esac
+}
+
+_list_missing_singbox_rulesets_from_routing_rules() {
+    local routing_rules="$1"
+    [[ -z "$routing_rules" || "$routing_rules" == "[]" ]] && return 0
+
+    local tags
+    tags=$(echo "$routing_rules" | jq -r '.[]? | .rule_set[]?' 2>/dev/null | sort -u)
+    [[ -z "$tags" ]] && return 0
+
+    local tag
+    for tag in $tags; do
+        local path=$(_singbox_ruleset_path "$tag")
+        [[ -s "$path" ]] || echo "$tag"
+    done
+}
+
+_ensure_singbox_rulesets_from_routing_rules() {
+    local routing_rules="$1"
+    [[ -z "$routing_rules" || "$routing_rules" == "[]" ]] && return 0
+
+    local tags
+    tags=$(echo "$routing_rules" | jq -r '.[]? | .rule_set[]?' 2>/dev/null | sort -u)
+    [[ -z "$tags" ]] && return 0
+
+    local missing_tags
+    missing_tags=$(_list_missing_singbox_rulesets_from_routing_rules "$routing_rules")
+    if [[ -n "$missing_tags" ]]; then
+        local missing_count
+        missing_count=$(printf '%s\n' "$missing_tags" | sed '/^$/d' | wc -l | tr -d ' ')
+        _info "正在准备 Sing-box 规则集缓存 (${missing_count} 项)..."
+        _warn "首次启用或缓存缺失时，需要下载并编译规则集，可能耗时 30~120 秒，请耐心等待"
+    fi
+
+    local tag
+    for tag in $tags; do
+        local path=$(_singbox_ruleset_path "$tag")
+        if [[ ! -s "$path" ]]; then
+            _info "生成规则集: $tag"
+            _build_singbox_ruleset "$tag" || {
+                _err "生成 Sing-box 规则集失败: $tag"
+                return 1
+            }
+        fi
+    done
+}
+
+_build_singbox_ruleset_defs() {
+    local routing_rules="$1"
+    [[ -z "$routing_rules" || "$routing_rules" == "[]" ]] && { echo "[]"; return 0; }
+
+    local defs="[]"
+    local tags=$(echo "$routing_rules" | jq -r '.[]? | .rule_set[]?' 2>/dev/null | sort -u)
+    [[ -z "$tags" ]] && { echo "[]"; return 0; }
+
+    local tag
+    for tag in $tags; do
+        local path=$(_singbox_ruleset_path "$tag")
+        defs=$(echo "$defs" | jq --arg tag "$tag" --arg path "$path" '. + [{type: "local", tag: $tag, format: "binary", path: $path}]')
+    done
+    echo "$defs"
+}
+
 # 生成 Sing-box 统一配置 (Hy2 + TUIC 共用一个进程)
 generate_singbox_config() {
+    _ensure_singbox_default_users
     local singbox_protocols=$(db_list_protocols "singbox")
     [[ -z "$singbox_protocols" ]] && return 1
     
@@ -8466,6 +9149,7 @@ generate_singbox_config() {
     # 收集所有需要的出口
     local outbounds=$(jq -n --argjson direct "$direct_outbound" '[$direct, {type: "block", tag: "block"}]')
     local routing_rules=""
+    local singbox_ruleset_defs="[]"
     local has_routing=false
     local warp_has_endpoint=false
     local warp_endpoint_data=""
@@ -8680,6 +9364,8 @@ generate_singbox_config() {
             if [[ "$warp_has_endpoint" == "true" ]]; then
                 routing_rules=$(echo "$routing_rules" | jq 'map(if ((.outbound // "") | startswith("warp")) then .outbound = "warp" else . end)')
             fi
+            _ensure_singbox_rulesets_from_routing_rules "$routing_rules" || return 1
+            singbox_ruleset_defs=$(_build_singbox_ruleset_defs "$routing_rules")
             has_routing=true
         fi
         
@@ -8765,6 +9451,9 @@ generate_singbox_config() {
         if [[ -n "$routing_rules" && "$routing_rules" != "[]" ]]; then
             base_config=$(echo "$base_config" | jq --argjson rules "$routing_rules" '.route.rules = $rules')
         fi
+        if [[ -n "$singbox_ruleset_defs" && "$singbox_ruleset_defs" != "[]" ]]; then
+            base_config=$(echo "$base_config" | jq --argjson sets "$singbox_ruleset_defs" '.route.rule_set = $sets')
+        fi
     else
         base_config=$(jq -n --argjson direct "$direct_outbound" '{
             log: {level: "warn", timestamp: true},
@@ -8820,12 +9509,12 @@ generate_singbox_config() {
                 
                 if [[ -n "$db_users" && "$db_users" != "[]" && "$db_users" != "null" ]]; then
                     # 有自定义用户，为每个用户生成 {name, password}
-                    # hy2 用户的 uuid 字段存储的是密码
-                    local default_user_json=$(jq -n --arg pw "$password" '{name: "default", password: $pw}')
-                    users_json=$(jq -n --argjson db_users "$db_users" --argjson chk_def "$default_user_json" '[$chk_def] + ($db_users | map({name: .name, password: .uuid}))')
+                    # hy2 用户的 uuid 字段存储的是密码；name 使用协议隔离后的内部统计键
+                    local default_user_json=$(jq -n --arg name "hy2-default" --arg pw "$password" '{name: $name, password: $pw}')
+                    users_json=$(jq -n --argjson db_users "$db_users" --argjson chk_def "$default_user_json" '([$chk_def] + ($db_users | map({name: ("hy2-" + .name), password: .uuid}))) | unique_by(.name)')
                 else
                     # 没有自定义用户，使用默认密码
-                    users_json=$(jq -n --arg pw "$password" '[{name: "default", password: $pw}]')
+                    users_json=$(jq -n --arg name "hy2-default" --arg pw "$password" '[{name: $name, password: $pw}]')
                 fi
                 
                 inbound=$(jq -n \
@@ -8859,10 +9548,29 @@ generate_singbox_config() {
                 local key_path="$CFG/certs/tuic/server.key"
                 [[ ! -f "$cert_path" ]] && { cert_path="$CFG/certs/server.crt"; key_path="$CFG/certs/server.key"; }
                 
+                # 构建用户列表：从数据库读取用户，如果没有则使用默认用户
+                local users_json="[]"
+                local db_users=$(jq -r --arg p "$proto" '
+                    .singbox[$p] as $cfg |
+                    if $cfg == null then empty
+                    elif ($cfg | type) == "array" then
+                        [$cfg[].users // [] | .[]] | unique_by(.name)
+                    else
+                        $cfg.users // []
+                    end
+                ' "$DB_FILE" 2>/dev/null)
+                
+                if [[ -n "$db_users" && "$db_users" != "[]" && "$db_users" != "null" ]]; then
+                    # TUIC 用户的 uuid 字段存储的是真正用户 UUID；name 使用协议隔离后的内部统计键
+                    local default_user_json=$(jq -n --arg name "tuic-default" --arg id "$uuid" --arg pw "$password" '{name: $name, uuid: $id, password: $pw}')
+                    users_json=$(jq -n --argjson db_users "$db_users" --argjson chk_def "$default_user_json" --arg pw "$password" '([$chk_def] + ($db_users | map({name: ("tuic-" + .name), uuid: .uuid, password: $pw}))) | unique_by(.name)')
+                else
+                    users_json=$(jq -n --arg name "tuic-default" --arg id "$uuid" --arg pw "$password" '[{name: $name, uuid: $id, password: $pw}]')
+                fi
+                
                 inbound=$(jq -n \
                     --argjson port "$port" \
-                    --arg uuid "$uuid" \
-                    --arg password "$password" \
+                    --argjson users "$users_json" \
                     --arg cert "$cert_path" \
                     --arg key "$key_path" \
                     --arg listen_addr "$listen_addr" \
@@ -8871,13 +9579,59 @@ generate_singbox_config() {
                     tag: "tuic-in",
                     listen: $listen_addr,
                     listen_port: $port,
-                    users: [{uuid: $uuid, password: $password}],
+                    users: $users,
                     congestion_control: "bbr",
                     tls: {
                         enabled: true,
                         certificate_path: $cert,
                         key_path: $key,
                         alpn: ["h3"]
+                    }
+                }')
+                ;;
+            anytls)
+                local password=$(echo "$cfg" | jq -r '.password // empty')
+                local sni=$(echo "$cfg" | jq -r '.sni // "www.bing.com"')
+                local cert_path="$CFG/certs/server.crt"
+                local key_path="$CFG/certs/server.key"
+                [[ ! -f "$cert_path" || ! -f "$key_path" ]] && continue
+
+                # 构建用户列表：从数据库读取用户，如果没有则使用默认用户
+                local users_json="[]"
+                local db_users=$(jq -r --arg p "$proto" '
+                    .singbox[$p] as $cfg |
+                    if $cfg == null then empty
+                    elif ($cfg | type) == "array" then
+                        [$cfg[].users // [] | .[]] | unique_by(.name)
+                    else
+                        $cfg.users // []
+                    end
+                ' "$DB_FILE" 2>/dev/null)
+
+                if [[ -n "$db_users" && "$db_users" != "[]" && "$db_users" != "null" ]]; then
+                    # AnyTLS 用户的 uuid 字段存储的是真正用户密码；name 使用协议隔离后的内部统计键
+                    local default_user_json=$(jq -n --arg name "anytls-default" --arg pw "$password" '{name: $name, password: $pw}')
+                    users_json=$(jq -n --argjson db_users "$db_users" --argjson chk_def "$default_user_json" '([$chk_def] + ($db_users | map({name: ("anytls-" + .name), password: .uuid}))) | unique_by(.name)')
+                else
+                    users_json=$(jq -n --arg name "anytls-default" --arg pw "$password" '[{name: $name, password: $pw}]')
+                fi
+
+                inbound=$(jq -n \
+                    --argjson port "$port" \
+                    --argjson users "$users_json" \
+                    --arg cert "$cert_path" \
+                    --arg key "$key_path" \
+                    --arg listen_addr "$listen_addr" \
+                '{
+                    type: "anytls",
+                    tag: "anytls-in",
+                    listen: $listen_addr,
+                    listen_port: $port,
+                    users: $users,
+                    tls: {
+                        enabled: true,
+                        certificate_path: $cert,
+                        key_path: $key
                     }
                 }')
                 ;;
@@ -8972,9 +9726,10 @@ generate_singbox_config() {
                     ;;
             esac
             
-            # 添加路由规则
+            # 添加路由规则（Sing-box 实际匹配的是内部统计键用户名）
+            local stat_user=$(_singbox_stat_key_for_user "$proto" "$uname")
             user_routing_rules=$(echo "$user_routing_rules" | jq \
-                --arg user "$uname" \
+                --arg user "$stat_user" \
                 --arg outbound "$outbound_name" \
                 '. + [{auth_user: [$user], outbound: $outbound}]')
         done <<< "$db_users"
@@ -8994,7 +9749,33 @@ generate_singbox_config() {
         fi
     fi
     
-    # 合并配置并写入文件（不生成 v2ray_api，精简版 sing-box 不支持流量统计）
+    # 收集可统计的 sing-box 用户标识，用于 V2Ray API 用户级流量统计
+    # HY2 / TUIC / AnyTLS 均使用用户名
+    local stats_users="[]"
+    for proto in hy2 tuic anytls; do
+        local mappings=$(_get_singbox_stat_user_mappings "$proto")
+        [[ -z "$mappings" ]] && continue
+        local proto_stats=$(printf '%s\n' "$mappings" | awk -F'|' 'NF>=2 && $2 != "" {print $2}' | jq -R . 2>/dev/null | jq -s . 2>/dev/null)
+        if [[ -n "$proto_stats" && "$proto_stats" != "null" ]]; then
+            stats_users=$(jq -n --argjson a "$stats_users" --argjson b "$proto_stats" '($a + $b) | map(select(. != null and . != "")) | unique')
+        fi
+    done
+
+    # 如果 sing-box 二进制带 with_v2ray_api，则生成用户级统计配置
+    if sing-box version 2>/dev/null | grep -q 'with_v2ray_api'; then
+        base_config=$(echo "$base_config" | jq \
+            --arg listen "127.0.0.1:${SINGBOX_V2RAY_API_PORT}" \
+            --argjson users "$stats_users" \
+            '.experimental.v2ray_api = {
+                listen: $listen,
+                stats: {
+                    enabled: true,
+                    users: $users
+                }
+            }')
+    fi
+
+    # 合并配置并写入文件
     echo "$base_config" | jq \
         --argjson ibs "$inbounds" \
         '.inbounds = $ibs' > "$CFG/singbox.json"
@@ -9034,6 +9815,7 @@ create_singbox_service() {
 name="Sing-box Proxy Server"
 command="/usr/local/bin/sing-box"
 command_args="run -c $CFG/singbox.json"
+command_env="ENABLE_DEPRECATED_LEGACY_DOMAIN_STRATEGY_OPTIONS=true"
 command_background="yes"
 pidfile="/run/${service_name}.pid"
 depend() { need net; }
@@ -9056,6 +9838,7 @@ After=network.target
 
 [Service]
 Type=simple
+Environment=ENABLE_DEPRECATED_LEGACY_DOMAIN_STRATEGY_OPTIONS=true
 ${pre_cmd}
 ExecStart=$exec_cmd
 Restart=always
@@ -9357,10 +10140,24 @@ gen_server_config() {
     
     register_protocol "vless" "$(build_config \
         uuid "$uuid" port "$port" private_key "$privkey" \
-        public_key "$pubkey" short_id "$sid" sni "$sni")"
+        public_key "$pubkey" short_id "$sid" sni "$sni" security_mode "reality")"
     
     _save_join_info "vless" "REALITY|%s|$port|$uuid|$pubkey|$sid|$sni" \
         "gen_vless_link %s $port $uuid $pubkey $sid $sni"
+    echo "server" > "$CFG/role"
+}
+
+# VLESS+Encryption (纯 TCP，无 Reality) 服务端配置
+gen_vless_encryption_server_config() {
+    local uuid="$1" port="$2" decryption="$3" encryption="$4"
+    mkdir -p "$CFG"
+
+    register_protocol "vless" "$(build_config \
+        uuid "$uuid" port "$port" decryption "$decryption" \
+        encryption "$encryption" security_mode "encryption")"
+
+    _save_join_info "vless" "VLESS-ENCRYPTION|%s|$port|$uuid|$encryption" \
+        "gen_vless_encryption_link %s $port $uuid $encryption"
     echo "server" > "$CFG/role"
 }
 
@@ -9635,10 +10432,13 @@ gen_tuic_server_config() {
     echo "server" > "$CFG/role"
 }
 
-# AnyTLS 服务端配置
+# AnyTLS 服务端配置（迁移到 Sing-box 核心）
 gen_anytls_server_config() {
     local password="$1" port="$2" sni="${3:-bing.com}"
     mkdir -p "$CFG"
+
+    # AnyTLS 在 Sing-box 中需要 TLS 配置；若当前没有证书则自动生成自签证书
+    [[ ! -f "$CFG/certs/server.crt" || ! -f "$CFG/certs/server.key" ]] && gen_self_cert "$sni"
 
     register_protocol "anytls" "$(build_config password "$password" port "$port" sni "$sni")"
     _save_join_info "anytls" "ANYTLS|%s|$port|$password|$sni" \
@@ -10413,6 +11213,29 @@ start_services() {
     fi
     
     return 0
+}
+
+ensure_singbox_runtime_consistency() {
+    local singbox_protocols=$(get_singbox_protocols)
+    [[ -z "$singbox_protocols" ]] && return 0
+    check_cmd sing-box || return 0
+
+    local need_rebuild=false
+    [[ ! -f "$CFG/singbox.json" ]] && need_rebuild=true
+
+    if [[ "$need_rebuild" == "false" ]] && ! /usr/local/bin/sing-box check -c "$CFG/singbox.json" >/dev/null 2>&1; then
+        need_rebuild=true
+    fi
+
+    if [[ "$need_rebuild" == "true" ]]; then
+        _info "检测到 Sing-box 配置缺失或无效，正在自动重建..."
+        generate_singbox_config || return 1
+        create_server_scripts
+        create_singbox_service
+        svc enable vless-singbox >/dev/null 2>&1 || true
+        svc restart vless-singbox || svc start vless-singbox || return 1
+        _ok "Sing-box 配置已自动修复"
+    fi
 }
 
 stop_services() {
@@ -12785,6 +13608,210 @@ test_routing() {
     return 0
 }
 
+# 访问限制预设（最小可用集）
+ACCESS_RESTRICT_CN_DOMAINS="geosite:cn,geoip:cn"
+ACCESS_RESTRICT_BTPT_DOMAINS="geosite:tracker"
+
+access_restriction_enabled() {
+    [[ ! -f "$DB_FILE" ]] && return 1
+    local count
+    count=$(jq '[.routing_rules[]? | select(
+        .id == "restrict-cn-geosite" or
+        .id == "restrict-cn-geoip" or
+        .id == "restrict-btpt-tracker" or
+        .id == "restrict-btpt-trackers" or
+        .id == "restrict-btpt-pt" or
+        .type == "restrict-cn" or
+        .type == "restrict-btpt" or
+        ((.outbound // "") == "block" and (
+            (.domains // "") == "geosite:tracker,geosite:public-tracker,geosite:private-tracker" or
+            (.domains // "") == "geosite:category-pt" or
+            (.domains // "") == "geosite:cn" or
+            (.domains // "") == "geoip:cn" or
+            (.domains // "") == "geosite:tracker" or
+            (.domains // "") == "geosite:public-tracker" or
+            (.domains // "") == "geosite:private-tracker"
+        ))
+    )] | length' "$DB_FILE" 2>/dev/null)
+    [[ "${count:-0}" -gt 0 ]]
+}
+
+_enable_access_rule() {
+    local type="$1" domains="$2"
+    db_del_routing_rule "$type" "by_type"
+    db_add_routing_rule "$type" "block" "$domains" "as_is"
+}
+
+cleanup_legacy_access_restriction_rules() {
+    [[ ! -f "$DB_FILE" ]] && return 0
+    local tmp=$(mktemp)
+    jq '.routing_rules = [.routing_rules[]? | select((
+        .id == "restrict-cn-geosite" or
+        .id == "restrict-cn-geoip" or
+        .id == "restrict-btpt-tracker" or
+        .id == "restrict-btpt-trackers" or
+        .id == "restrict-btpt-pt" or
+        .type == "restrict-cn" or
+        .type == "restrict-btpt" or
+        ((.outbound // "") == "block" and (
+            (.domains // "") == "geosite:tracker,geosite:public-tracker,geosite:private-tracker" or
+            (.domains // "") == "geosite:category-pt" or
+            (.domains // "") == "geosite:cn" or
+            (.domains // "") == "geoip:cn" or
+            (.domains // "") == "geosite:tracker" or
+            (.domains // "") == "geosite:public-tracker" or
+            (.domains // "") == "geosite:private-tracker"
+        ))
+    ) | not)]' "$DB_FILE" > "$tmp" && mv "$tmp" "$DB_FILE"
+}
+
+disable_access_restriction() {
+    db_del_routing_rule "restrict-cn" "by_type"
+    db_del_routing_rule "restrict-btpt" "by_type"
+    cleanup_legacy_access_restriction_rules
+    _regenerate_proxy_configs
+    _ok "访问限制已关闭"
+    _pause
+}
+
+show_access_restriction_status() {
+    _header
+    echo -e "  ${W}访问限制状态${NC}"
+    _line
+    local rules=$(db_get_routing_rules)
+    local cn_enabled="否" bt_enabled="否"
+    echo "$rules" | jq -e '.[] | select(
+        .id == "restrict-cn-geosite" or
+        .id == "restrict-cn-geoip" or
+        .type == "restrict-cn" or
+        ((.outbound // "") == "block" and ((.domains // "") == "geosite:cn" or (.domains // "") == "geoip:cn"))
+    )' >/dev/null 2>&1 && cn_enabled="是"
+    echo "$rules" | jq -e '.[] | select(
+        .id == "restrict-btpt-tracker" or
+        .id == "restrict-btpt-trackers" or
+        .id == "restrict-btpt-pt" or
+        .type == "restrict-btpt" or
+        ((.outbound // "") == "block" and (
+            (.domains // "") == "geosite:tracker" or
+            (.domains // "") == "geosite:public-tracker" or
+            (.domains // "") == "geosite:private-tracker" or
+            (.domains // "") == "geosite:tracker,geosite:public-tracker,geosite:private-tracker" or
+            (.domains // "") == "geosite:category-pt"
+        ))
+    )' >/dev/null 2>&1 && bt_enabled="是"
+    echo -e "  禁止回国: ${G}${cn_enabled}${NC}"
+    echo -e "  禁止 BT/PT: ${G}${bt_enabled}${NC}"
+    echo ""
+    echo -e "  ${D}当前预设规则:${NC}"
+    echo "$rules" | jq -r '.[] | select(
+        .id == "restrict-cn-geosite" or
+        .id == "restrict-cn-geoip" or
+        .id == "restrict-btpt-tracker" or
+        .id == "restrict-btpt-trackers" or
+        .id == "restrict-btpt-pt" or
+        .type == "restrict-cn" or
+        .type == "restrict-btpt" or
+        ((.outbound // "") == "block" and (
+            (.domains // "") == "geosite:cn" or
+            (.domains // "") == "geoip:cn" or
+            (.domains // "") == "geosite:tracker" or
+            (.domains // "") == "geosite:public-tracker" or
+            (.domains // "") == "geosite:private-tracker" or
+            (.domains // "") == "geosite:tracker,geosite:public-tracker,geosite:private-tracker" or
+            (.domains // "") == "geosite:category-pt"
+        ))
+    ) | "  • " + (.id // .type // "legacy") + " -> " + (.outbound // "") + " (" + (.domains // "") + ")"' 2>/dev/null || true
+    _line
+    read -rp "  按回车返回... " _
+}
+
+enable_access_restriction() {
+    _header
+    echo -e "  ${W}启用回国 / BT/PT 限制${NC}"
+    _line
+    echo -e "  ${D}将写入以下预设拦截规则:${NC}"
+    echo -e "  • geosite:cn / geoip:cn -> block"
+    echo -e "  • geosite:tracker -> block"
+    echo ""
+    read -rp "  确认启用? [Y/n]: " confirm
+    [[ "$confirm" =~ ^[nN]$ ]] && return 0
+    cleanup_legacy_access_restriction_rules
+    db_add_routing_rule "custom" "block" "geosite:cn" "as_is"
+    python3 - "$DB_FILE" <<'PY2'
+import json,sys
+from pathlib import Path
+p=Path(sys.argv[1])
+d=json.loads(p.read_text())
+for r in d.get('routing_rules',[]):
+    if r.get('domains')=='geosite:cn' and r.get('outbound')=='block':
+        r['id']='restrict-cn-geosite'
+        break
+p.write_text(json.dumps(d,ensure_ascii=False,indent=2))
+PY2
+    db_add_routing_rule "custom" "block" "geoip:cn" "as_is"
+    python3 - "$DB_FILE" <<'PY2'
+import json,sys
+from pathlib import Path
+p=Path(sys.argv[1])
+d=json.loads(p.read_text())
+for r in d.get('routing_rules',[]):
+    if r.get('domains')=='geoip:cn' and r.get('outbound')=='block':
+        r['id']='restrict-cn-geoip'
+        break
+p.write_text(json.dumps(d,ensure_ascii=False,indent=2))
+PY2
+    db_add_routing_rule "custom" "block" "geosite:tracker" "as_is"
+    python3 - "$DB_FILE" <<'PY2'
+import json,sys
+from pathlib import Path
+p=Path(sys.argv[1])
+d=json.loads(p.read_text())
+for r in d.get('routing_rules',[]):
+    if r.get('domains')=='geosite:tracker' and r.get('outbound')=='block':
+        r['id']='restrict-btpt-tracker'
+        break
+p.write_text(json.dumps(d,ensure_ascii=False,indent=2))
+PY2
+
+    if [[ -n "$(get_singbox_protocols 2>/dev/null)" ]]; then
+        echo ""
+        _info "正在重建代理配置..."
+        _info "若本机首次为 Sing-box 启用访问限制，可能会额外下载并编译规则集"
+    fi
+
+    _regenerate_proxy_configs
+    _ok "访问限制已启用"
+    sleep 1
+    return 0
+}
+
+manage_access_restrictions() {
+    while true; do
+        _header
+        echo -e "  ${W}访问限制${NC}"
+        _line
+        local access_action="启用回国 / BT/PT 限制"
+        access_restriction_enabled && access_action="关闭回国 / BT/PT 限制"
+        _item "1" "$access_action"
+        _item "2" "查看当前限制状态"
+        _item "0" "返回"
+        _line
+        read -rp "  请选择: " choice
+        case "$choice" in
+            1)
+                if access_restriction_enabled; then
+                    disable_access_restriction
+                else
+                    enable_access_restriction
+                fi
+                ;;
+            2) show_access_restriction_status ;;
+            0) return ;;
+            *) _err "无效选择"; sleep 1 ;;
+        esac
+    done
+}
+
 # 配置分流规则
 configure_routing_rules() {
     while true; do
@@ -13546,8 +14573,9 @@ manage_routing() {
         _item "3" "配置分流规则"
         _item "4" "直连出口设置"
         _item "5" "多IP入出站配置"
-        _item "6" "测试分流效果"
-        _item "7" "查看当前配置"
+        _item "6" "访问限制"
+        _item "7" "测试分流效果"
+        _item "8" "查看当前配置"
         _item "0" "返回"
         _line
         
@@ -13559,13 +14587,14 @@ manage_routing() {
             3) configure_routing_rules ;;
             4) configure_direct_outbound ;;
             5) manage_ip_routing ;;
-            6)
+            6) manage_access_restrictions ;;
+            7)
                 _header
                 echo -e "  ${W}测试分流效果${NC}"
                 test_routing
                 _pause
                 ;;
-            7)
+            8)
                 _header
                 echo -e "  ${W}当前分流配置${NC}"
                 _line
@@ -13579,6 +14608,7 @@ manage_routing() {
                 read -rp "  按回车返回..." _
                 ;;
             0) return ;;
+            *) _err "无效选择"; _pause ;;
         esac
     done
 }
@@ -13881,6 +14911,35 @@ db_chain_node_exists() {
     local name="$1"
     local result=$(jq -r --arg name "$name" '.chain_proxy.nodes[]? | select(.name == $name) | .name' "$DB_FILE" 2>/dev/null)
     [[ -n "$result" && "$result" != "null" ]]
+}
+
+# 重命名链式代理节点
+# 返回: 0=成功, 1=目标名已存在或源不存在, 2=写入失败
+db_rename_chain_node() {
+    local old_name="$1" new_name="$2"
+    [[ -z "$old_name" || -z "$new_name" || "$old_name" == "$new_name" ]] && return 1
+    db_chain_node_exists "$old_name" || return 1
+    if db_chain_node_exists "$new_name"; then
+        return 1
+    fi
+
+    local tmp=$(mktemp)
+    if jq --arg old "$old_name" --arg new "$new_name" '
+        .chain_proxy.nodes = [(.chain_proxy.nodes // [])[] | if .name == $old then .name = $new else . end]
+        | if .chain_proxy.active == $old then .chain_proxy.active = $new else . end
+        | if .routing_rules then
+            .routing_rules = [.routing_rules[] | if .outbound == ("chain:" + $old) then .outbound = ("chain:" + $new) else . end]
+          else . end
+        | if .balancer_groups then
+            .balancer_groups = [.balancer_groups[] | if .nodes then .nodes = [.nodes[] | if . == $old then $new else . end] else . end]
+          else . end
+    ' "$DB_FILE" > "$tmp"; then
+        mv "$tmp" "$DB_FILE"
+        return 0
+    fi
+
+    rm -f "$tmp"
+    return 2
 }
 
 # 解析 host:port 格式（支持 IPv6）
@@ -16262,7 +17321,15 @@ show_all_share_links() {
                 local config_ip="$ipv4"
                 
                 case "$protocol" in
-                    vless) link=$(gen_vless_link "$ipv4" "$display_port" "$uuid" "$public_key" "$short_id" "$sni" "$country_code") ;;
+                    vless)
+                        local security_mode=$(echo "$cfg" | jq -r '.security_mode // "reality"')
+                        if [[ "$security_mode" == "encryption" ]]; then
+                            local encryption=$(echo "$cfg" | jq -r '.encryption // empty')
+                            link=$(gen_vless_encryption_link "$ipv4" "$display_port" "$uuid" "$encryption" "$country_code")
+                        else
+                            link=$(gen_vless_link "$ipv4" "$display_port" "$uuid" "$public_key" "$short_id" "$sni" "$country_code")
+                        fi
+                        ;;
                     vless-xhttp) link=$(gen_vless_xhttp_link "$ipv4" "$display_port" "$uuid" "$public_key" "$short_id" "$sni" "$path" "$country_code") ;;
                     vless-vision) link=$(gen_vless_vision_link "$ipv4" "$display_port" "$uuid" "$sni" "$country_code") ;;
                     vless-ws) link=$(gen_vless_ws_link "$ipv4" "$display_port" "$uuid" "$sni" "$path" "$country_code") ;;
@@ -16305,7 +17372,15 @@ show_all_share_links() {
                 local link=""
                 local ip6="[$ipv6]"
                 case "$protocol" in
-                    vless) link=$(gen_vless_link "$ip6" "$display_port" "$uuid" "$public_key" "$short_id" "$sni" "$country_code") ;;
+                    vless)
+                        local security_mode=$(echo "$cfg" | jq -r '.security_mode // "reality"')
+                        if [[ "$security_mode" == "encryption" ]]; then
+                            local encryption=$(echo "$cfg" | jq -r '.encryption // empty')
+                            link=$(gen_vless_encryption_link "$ip6" "$display_port" "$uuid" "$encryption" "$country_code")
+                        else
+                            link=$(gen_vless_link "$ip6" "$display_port" "$uuid" "$public_key" "$short_id" "$sni" "$country_code")
+                        fi
+                        ;;
                     vless-xhttp) link=$(gen_vless_xhttp_link "$ip6" "$display_port" "$uuid" "$public_key" "$short_id" "$sni" "$path" "$country_code") ;;
                     vless-vision) link=$(gen_vless_vision_link "$ip6" "$display_port" "$uuid" "$sni" "$country_code") ;;
                     vless-ws) link=$(gen_vless_ws_link "$ip6" "$display_port" "$uuid" "$sni" "$path" "$country_code") ;;
@@ -16490,12 +17565,22 @@ show_single_protocol_info() {
     
     case "$protocol" in
         vless)
-            echo -e "  UUID: ${G}$uuid${NC}"
-            echo -e "  公钥: ${G}$public_key${NC}"
-            echo -e "  SNI: ${G}$sni${NC}  ShortID: ${G}$short_id${NC}"
-            echo ""
-            echo -e "  ${Y}Loon 配置:${NC}"
-            echo -e "  ${C}${country_code}-Vless-Reality = VLESS, ${config_ip}, ${display_port}, \"${uuid}\", transport=tcp, flow=xtls-rprx-vision, public-key=\"${public_key}\", short-id=${short_id}, udp=true, over-tls=true, sni=${sni}${NC}"
+            local security_mode=$(echo "$cfg" | jq -r '.security_mode // "reality"')
+            if [[ "$security_mode" == "encryption" ]]; then
+                local encryption=$(echo "$cfg" | jq -r '.encryption // empty')
+                echo -e "  UUID: ${G}$uuid${NC}"
+                echo -e "  模式: ${G}VLESS+Encryption${NC}"
+                echo -e "  Encryption: ${G}${encryption}${NC}"
+                echo ""
+                echo -e "  ${D}注: 请优先使用分享链接导入客户端${NC}"
+            else
+                echo -e "  UUID: ${G}$uuid${NC}"
+                echo -e "  公钥: ${G}$public_key${NC}"
+                echo -e "  SNI: ${G}$sni${NC}  ShortID: ${G}$short_id${NC}"
+                echo ""
+                echo -e "  ${Y}Loon 配置:${NC}"
+                echo -e "  ${C}${country_code}-Vless-Reality = VLESS, ${config_ip}, ${display_port}, \"${uuid}\", transport=tcp, flow=xtls-rprx-vision, public-key=\"${public_key}\", short-id=${short_id}, udp=true, over-tls=true, sni=${sni}${NC}"
+            fi
             ;;
         vless-xhttp)
             echo -e "  UUID: ${G}$uuid${NC}"
@@ -16776,8 +17861,15 @@ show_single_protocol_info() {
         local link join_code
         case "$protocol" in
             vless)
-                link=$(gen_vless_link "$ip_addr" "$link_port" "$uuid" "$public_key" "$short_id" "$sni" "$country_code")
-                join_code=$(echo "REALITY|${ip_addr}|${link_port}|${uuid}|${public_key}|${short_id}|${sni}" | base64 -w 0)
+                local security_mode=$(echo "$cfg" | jq -r '.security_mode // "reality"')
+                if [[ "$security_mode" == "encryption" ]]; then
+                    local encryption=$(echo "$cfg" | jq -r '.encryption // empty')
+                    link=$(gen_vless_encryption_link "$ip_addr" "$link_port" "$uuid" "$encryption" "$country_code")
+                    join_code=$(echo "VLESS-ENCRYPTION|${ip_addr}|${link_port}|${uuid}|${encryption}" | base64 -w 0)
+                else
+                    link=$(gen_vless_link "$ip_addr" "$link_port" "$uuid" "$public_key" "$short_id" "$sni" "$country_code")
+                    join_code=$(echo "REALITY|${ip_addr}|${link_port}|${uuid}|${public_key}|${short_id}|${sni}" | base64 -w 0)
+                fi
                 ;;
             vless-xhttp)
                 link=$(gen_vless_xhttp_link "$ip_addr" "$link_port" "$uuid" "$public_key" "$short_id" "$sni" "$path" "$country_code")
@@ -17729,8 +18821,32 @@ do_uninstall() {
 # 协议安装流程
 #═══════════════════════════════════════════════════════════════════════════════
 
+# VLESS 模式选择
+select_vless_mode() {
+    echo ""
+    _line
+    echo -e "  ${W}VLESS 模式选择${NC}"
+    _line
+    _item "1" "VLESS + Reality ${D}(默认)${NC}"
+    _item "2" "VLESS + Encryption ${D}(无TLS)${NC}"
+    _item "0" "返回"
+    echo ""
+
+    while true; do
+        read -rp "  请选择 [1]: " vless_mode_choice
+        vless_mode_choice="${vless_mode_choice:-1}"
+        case "$vless_mode_choice" in
+            1) VLESS_SECURITY_MODE="reality"; SELECTED_PROTOCOL="vless"; return 0 ;;
+            2) VLESS_SECURITY_MODE="encryption"; SELECTED_PROTOCOL="vless"; return 0 ;;
+            0) SELECTED_PROTOCOL=""; return 1 ;;
+            *) _err "无效选择" ;;
+        esac
+    done
+}
+
 # 协议选择菜单
 select_protocol() {
+    VLESS_SECURITY_MODE="reality"
     echo ""
     _line
     echo -e "  ${W}选择代理协议${NC}"
@@ -17764,7 +18880,7 @@ select_protocol() {
         read -rp "  选择协议 [0-14]: " choice
         case $choice in
             0) SELECTED_PROTOCOL=""; return 1 ;;
-            1) SELECTED_PROTOCOL="vless"; break ;;
+            1) select_vless_mode || return 1; break ;;
             2) SELECTED_PROTOCOL="vless-xhttp"; break ;;
             3) SELECTED_PROTOCOL="vless-ws"; break ;;
             4) SELECTED_PROTOCOL="vmess-ws"; break ;;
@@ -17977,7 +19093,7 @@ do_install_server() {
         vless|vless-xhttp|vless-ws|vless-ws-notls|vmess-ws|vless-vision|ss2022|ss-legacy|trojan|socks)
             install_xray || { _err "Xray 安装失败"; _pause; return 1; }
             ;;
-        hy2|tuic)
+        hy2|tuic|anytls)
             install_singbox || { _err "Sing-box 安装失败"; _pause; return 1; }
             ;;
         snell)
@@ -18037,42 +19153,67 @@ do_install_server() {
     
     case "$protocol" in
         vless)
-            local uuid=$(gen_uuid) sid=$(gen_sid)
-            local keys=$(xray x25519 2>/dev/null)
-            [[ -z "$keys" ]] && { _err "密钥生成失败"; _pause; return 1; }
-            local privkey=$(echo "$keys" | grep "PrivateKey:" | awk '{print $2}')
-            local pubkey=$(echo "$keys" | grep "Password:" | awk '{print $2}')
-            [[ -z "$privkey" || -z "$pubkey" ]] && { _err "密钥提取失败"; _pause; return 1; }
-            
-            # 使用统一的证书和 Nginx 配置函数
-            setup_cert_and_nginx "vless"
-            local cert_domain="$CERT_DOMAIN"
-            
-            # 询问SNI配置
-            local final_sni=$(ask_sni_config "$(gen_sni)" "$cert_domain")
-            
-            # 如果没有真实域名，用选择的 SNI 重新生成自签证书
-            if [[ -z "$cert_domain" ]]; then
-                gen_self_cert "$final_sni"
+            if [[ "${VLESS_SECURITY_MODE:-reality}" == "encryption" ]]; then
+                local uuid=$(gen_uuid)
+                local vlessenc_output decryption_config encryption_config
+                vlessenc_output=$(xray vlessenc 2>/dev/null)
+                [[ -z "$vlessenc_output" ]] && { _err "VLESS Encryption 参数生成失败"; _pause; return 1; }
+                decryption_config=$(printf '%s\n' "$vlessenc_output" | sed -n 's/.*"decryption": "\([^"]*\)".*/\1/p' | head -n1)
+                encryption_config=$(printf '%s\n' "$vlessenc_output" | sed -n 's/.*"encryption": "\([^"]*\)".*/\1/p' | head -n1)
+                [[ -z "$decryption_config" || -z "$encryption_config" ]] && { _err "无法解析 VLESS Encryption 参数"; _pause; return 1; }
+
+                echo ""
+                _line
+                echo -e "  ${C}VLESS+Encryption 配置${NC}"
+                _line
+                echo -e "  端口: ${G}$port${NC}  UUID: ${G}${uuid:0:8}...${NC}"
+                echo -e "  模式: ${G}pure / native / 0rtt${NC}"
+                echo -e "  ${D}注: 请优先使用分享链接导入客户端${NC}"
+                _line
+                echo ""
+                read -rp "  确认安装? [Y/n]: " confirm
+                [[ "$confirm" =~ ^[nN]$ ]] && return
+
+                _info "生成配置..."
+                gen_vless_encryption_server_config "$uuid" "$port" "$decryption_config" "$encryption_config"
+            else
+                local uuid=$(gen_uuid) sid=$(gen_sid)
+                local keys=$(xray x25519 2>/dev/null)
+                [[ -z "$keys" ]] && { _err "密钥生成失败"; _pause; return 1; }
+                local privkey=$(echo "$keys" | grep "PrivateKey:" | awk '{print $2}')
+                local pubkey=$(echo "$keys" | awk -F': *' '/Password( \(PublicKey\))?:|PublicKey:/ {print $2; exit}')
+                [[ -z "$privkey" || -z "$pubkey" ]] && { _err "密钥提取失败"; _pause; return 1; }
+                
+                # 使用统一的证书和 Nginx 配置函数
+                setup_cert_and_nginx "vless"
+                local cert_domain="$CERT_DOMAIN"
+                
+                # 询问SNI配置
+                local final_sni=$(ask_sni_config "$(gen_sni)" "$cert_domain")
+                
+                # 如果没有真实域名，用选择的 SNI 重新生成自签证书
+                if [[ -z "$cert_domain" ]]; then
+                    gen_self_cert "$final_sni"
+                fi
+                
+                echo ""
+                _line
+                echo -e "  ${C}VLESS+Reality 配置${NC}"
+                _line
+                echo -e "  端口: ${G}$port${NC}  UUID: ${G}${uuid:0:8}...${NC}"
+                echo -e "  SNI: ${G}$final_sni${NC}  ShortID: ${G}$sid${NC}"
+                # Reality 真实域名模式时，订阅走 Reality 端口，不显示 Nginx 端口
+                if [[ -n "$CERT_DOMAIN" && "$final_sni" == "$CERT_DOMAIN" ]]; then
+                    echo -e "  ${D}(订阅通过 Reality 端口访问)${NC}"
+                fi
+                _line
+                echo ""
+                read -rp "  确认安装? [Y/n]: " confirm
+                [[ "$confirm" =~ ^[nN]$ ]] && return
+                
+                _info "生成配置..."
+                gen_server_config "$uuid" "$port" "$privkey" "$pubkey" "$sid" "$final_sni"
             fi
-            
-            echo ""
-            _line
-            echo -e "  ${C}VLESS+Reality 配置${NC}"
-            _line
-            echo -e "  端口: ${G}$port${NC}  UUID: ${G}${uuid:0:8}...${NC}"
-            echo -e "  SNI: ${G}$final_sni${NC}  ShortID: ${G}$sid${NC}"
-            # Reality 真实域名模式时，订阅走 Reality 端口，不显示 Nginx 端口
-            if [[ -n "$CERT_DOMAIN" && "$final_sni" == "$CERT_DOMAIN" ]]; then
-                echo -e "  ${D}(订阅通过 Reality 端口访问)${NC}"
-            fi
-            _line
-            echo ""
-            read -rp "  确认安装? [Y/n]: " confirm
-            [[ "$confirm" =~ ^[nN]$ ]] && return
-            
-            _info "生成配置..."
-            gen_server_config "$uuid" "$port" "$privkey" "$pubkey" "$sid" "$final_sni"
             ;;
         vless-xhttp)
             # 选择 XHTTP 模式
@@ -18103,7 +19244,7 @@ do_install_server() {
                 local keys=$(xray x25519 2>/dev/null)
                 [[ -z "$keys" ]] && { _err "密钥生成失败"; _pause; return 1; }
                 local privkey=$(echo "$keys" | grep "PrivateKey:" | awk '{print $2}')
-                local pubkey=$(echo "$keys" | grep "Password:" | awk '{print $2}')
+                local pubkey=$(echo "$keys" | awk -F': *' '/Password( \(PublicKey\))?:|PublicKey:/ {print $2; exit}')
                 [[ -z "$privkey" || -z "$pubkey" ]] && { _err "密钥提取失败"; _pause; return 1; }
                 
                 # 使用统一的证书和 Nginx 配置函数
@@ -19053,6 +20194,28 @@ do_install_server() {
     
     if start_services; then
         create_shortcut   # 安装成功才创建快捷命令
+
+        # 对 Sing-box 协议做一次显式重建与校验，避免交互安装后配置未完全落盘
+        if [[ "${PROTO_KIND[$current_protocol]}" == "singbox" ]]; then
+            generate_singbox_config || { _err "Sing-box 配置重建失败"; _pause; return 1; }
+            create_server_scripts
+            create_singbox_service
+            svc enable vless-singbox >/dev/null 2>&1 || true
+            svc restart vless-singbox || svc start vless-singbox || { _err "Sing-box 服务重启失败"; _pause; return 1; }
+            if [[ ! -f "$CFG/singbox.json" ]] || ! /usr/local/bin/sing-box check -c "$CFG/singbox.json" >/dev/null 2>&1; then
+                _err "Sing-box 配置文件未正确生成或校验失败"
+                _pause
+                return 1
+            fi
+        fi
+
+        # 已启用 TG 通知且当前安装的是 Xray 协议时，自动补齐流量统计定时任务
+        if [[ "${PROTO_KIND[$current_protocol]}" == "xray" ]]; then
+            local tg_enabled=$(tg_get_config "enabled")
+            if [[ "$tg_enabled" == "true" ]] && ! crontab -l 2>/dev/null | grep -q "sync-traffic"; then
+                setup_traffic_cron "$(get_traffic_interval)"
+            fi
+        fi
         
         # 更新订阅文件（此时数据库已更新，订阅内容才会正确）
         if [[ -f "$CFG/sub.info" ]]; then
@@ -19301,6 +20464,11 @@ show_status() {
         fi
         
         echo -e "  分流: ${G}${rules_count}条规则${display_info}${NC}"
+    fi
+    if access_restriction_enabled; then
+        echo -e "  访问限制: ${G}已启用${NC}"
+    else
+        echo -e "  访问限制: ${D}未启用${NC}"
     fi
 }
 
@@ -20086,6 +21254,18 @@ external_link_to_surge() {
     esac
 }
 
+# 设置/替换分享链接名称
+set_link_name() {
+    local link="$1" new_name="$2"
+    local base="${link%%#*}"
+    [[ -z "$new_name" ]] && { echo "$base"; return 0; }
+    python3 - "$base" "$new_name" <<'PYEOF'
+import sys, urllib.parse
+base, name = sys.argv[1], sys.argv[2]
+print(base + '#' + urllib.parse.quote(name, safe=''))
+PYEOF
+}
+
 # 添加分享链接
 add_external_link() {
     echo ""
@@ -20095,30 +21275,32 @@ add_external_link() {
     _line
     echo ""
     read -rp "  请输入分享链接: " link
-    
+
     [[ -z "$link" ]] && return
-    
+
     # 验证链接格式
     if [[ "$link" != *"://"* ]]; then
         _err "无效的链接格式"
         return 1
     fi
-    
+
+    local name=$(get_link_name "$link")
+    echo -e "  ${D}直接回车保留原名称，或输入新名称${NC}"
+    read -rp "  节点名称 [$name]: " custom_name
+    [[ -n "$custom_name" ]] && link="$(set_link_name "$link" "$custom_name")" && name="$custom_name"
+
     # 检查是否已存在
     if [[ -f "$EXTERNAL_LINKS_FILE" ]] && grep -qF "$link" "$EXTERNAL_LINKS_FILE"; then
         _warn "该链接已存在"
         return 1
     fi
-    
-    # 解析获取名称
-    local name=$(get_link_name "$link")
-    
+
     # 保存
     mkdir -p "$(dirname "$EXTERNAL_LINKS_FILE")"
     echo "$link" >> "$EXTERNAL_LINKS_FILE"
-    
+
     _ok "已添加节点: $name"
-    
+
     # 自动更新订阅文件
     if [[ -f "$CFG/sub.info" ]]; then
         generate_sub_files
@@ -20223,6 +21405,62 @@ show_external_nodes() {
     _line
 }
 
+# 重命名外部节点
+rename_external_node() {
+    [[ -f "$EXTERNAL_LINKS_FILE" ]] || { _warn "没有可重命名的分享链接节点"; return; }
+
+    echo ""
+    _line
+    echo -e "  ${W}重命名外部节点${NC}"
+    _line
+
+    mapfile -t links < <(grep -v '^\s*#' "$EXTERNAL_LINKS_FILE" 2>/dev/null | sed '/^\s*$/d')
+    [[ ${#links[@]} -gt 0 ]] || { _warn "没有可重命名的分享链接节点"; return; }
+
+    local i=0
+    for link in "${links[@]}"; do
+        ((i++))
+        echo -e "  ${G}$i)${NC} [${link%%://*}] $(get_link_name "$link")"
+    done
+
+    echo ""
+    local rename_idx old_link old_name new_name new_link
+    read -rp "  输入序号重命名 (0 取消): " rename_idx
+    [[ "$rename_idx" == "0" || -z "$rename_idx" ]] && return
+    [[ "$rename_idx" =~ ^[0-9]+$ ]] || { _err "无效序号"; return; }
+    (( rename_idx >= 1 && rename_idx <= ${#links[@]} )) || { _err "无效序号"; return; }
+
+    old_link="${links[$((rename_idx-1))]}"
+    old_name=$(get_link_name "$old_link")
+    read -rp "  新名称 [$old_name]: " new_name
+    new_name="${new_name:-$old_name}"
+    [[ "$new_name" == "$old_name" ]] && { _info "名称未变更"; return; }
+
+    new_link=$(set_link_name "$old_link" "$new_name")
+    python3 - "$EXTERNAL_LINKS_FILE" "$old_link" "$new_link" <<'PYEOF'
+from pathlib import Path
+import sys
+path=Path(sys.argv[1])
+old=sys.argv[2]
+new=sys.argv[3]
+lines=path.read_text().splitlines()
+replaced=False
+out=[]
+for line in lines:
+    if not replaced and line == old:
+        out.append(new)
+        replaced=True
+    else:
+        out.append(line)
+path.write_text(chr(10).join(out) + (chr(10) if out else ""))
+print('ok' if replaced else 'missing')
+PYEOF
+    [[ $? -eq 0 ]] || { _err "重命名失败"; return; }
+
+    _ok "已重命名: $old_name -> $new_name"
+    [[ -f "$CFG/sub.info" ]] && generate_sub_files
+}
+
 # 删除外部节点
 delete_external_node() {
     echo ""
@@ -20296,8 +21534,9 @@ manage_external_nodes() {
         _item "1" "添加分享链接"
         _item "2" "添加订阅链接"
         _item "3" "查看外部节点"
-        _item "4" "删除外部节点"
-        _item "5" "刷新订阅"
+        _item "4" "重命名外部节点"
+        _item "5" "删除外部节点"
+        _item "6" "刷新订阅"
         _line
         _item "0" "返回"
         _line
@@ -20308,8 +21547,9 @@ manage_external_nodes() {
             1) add_external_link ;;
             2) add_external_sub ;;
             3) show_external_nodes ;;
-            4) delete_external_node ;;
-            5) refresh_external_subs ;;
+            4) rename_external_node ;;
+            5) delete_external_node ;;
+            6) refresh_external_subs ;;
             0|"") return ;;
             *) _err "无效选择" ;;
         esac
@@ -20406,7 +21646,13 @@ gen_v2ray_sub() {
             local link=""
             case "$protocol" in
                 vless)
-                    [[ -n "$server_ip" ]] && link=$(gen_vless_link "$server_ip" "$actual_port" "$uuid" "$public_key" "$short_id" "$sni" "$country_code")
+                    local security_mode=$(echo "$cfg" | jq -r '.security_mode // "reality"')
+                    if [[ "$security_mode" == "encryption" ]]; then
+                        local encryption=$(echo "$cfg" | jq -r '.encryption // empty')
+                        [[ -n "$server_ip" ]] && link=$(gen_vless_encryption_link "$server_ip" "$actual_port" "$uuid" "$encryption" "$country_code")
+                    else
+                        [[ -n "$server_ip" ]] && link=$(gen_vless_link "$server_ip" "$actual_port" "$uuid" "$public_key" "$short_id" "$sni" "$country_code")
+                    fi
                     ;;
                 vless-xhttp)
                     [[ -n "$server_ip" ]] && link=$(gen_vless_xhttp_link "$server_ip" "$actual_port" "$uuid" "$public_key" "$short_id" "$sni" "$path" "$country_code")
@@ -23050,7 +24296,15 @@ _gen_user_share_link() {
     if [[ -n "$ipv4" ]]; then
         local link=""
         case "$proto" in
-            vless) link=$(gen_vless_link "$ipv4" "$display_port" "$uuid" "$public_key" "$short_id" "$sni" "$remark") ;;
+            vless)
+                local security_mode=$(echo "$cfg" | jq -r '.security_mode // "reality"')
+                if [[ "$security_mode" == "encryption" ]]; then
+                    local encryption=$(echo "$cfg" | jq -r '.encryption // empty')
+                    link=$(gen_vless_encryption_link "$ipv4" "$display_port" "$uuid" "$encryption" "$remark")
+                else
+                    link=$(gen_vless_link "$ipv4" "$display_port" "$uuid" "$public_key" "$short_id" "$sni" "$remark")
+                fi
+                ;;
             vless-xhttp) link=$(gen_vless_xhttp_link "$ipv4" "$display_port" "$uuid" "$public_key" "$short_id" "$sni" "$path" "$remark") ;;
             vless-vision) link=$(gen_vless_vision_link "$ipv4" "$display_port" "$uuid" "$sni" "$remark") ;;
             vless-ws) link=$(gen_vless_ws_link "$ipv4" "$display_port" "$uuid" "$sni" "$path" "$remark") ;;
@@ -24027,6 +25281,7 @@ _configure_tg_notify() {
         local enabled=$(tg_get_config "enabled")
         local bot_token=$(tg_get_config "bot_token")
         local chat_id=$(tg_get_config "chat_id")
+        local server_name=$(tg_get_config "server_name")
         local daily_enabled=$(tg_get_config "notify_daily")
         local report_hour=$(tg_get_config "daily_report_hour")
         local report_minute=$(tg_get_config "daily_report_minute")
@@ -24056,11 +25311,13 @@ _configure_tg_notify() {
         echo -e "  每日报告: $daily_status"
         echo -e "  Bot Token: ${bot_token:+${G}已配置${NC}}${bot_token:-${D}未配置${NC}}"
         echo -e "  Chat ID: ${chat_id:+${G}$chat_id${NC}}${chat_id:-${D}未配置${NC}}"
+        echo -e "  服务器名: ${server_name:+${G}$server_name${NC}}${server_name:-${D}未设置${NC}}"
         _line
         
         _item "1" "设置 Bot Token"
         _item "2" "设置 Chat ID"
         _item "3" "测试发送"
+        _item "7" "设置服务器名 (回车留空)"
         if [[ "$enabled" == "true" ]]; then
             _item "4" "禁用通知"
         else
@@ -24108,6 +25365,19 @@ _configure_tg_notify() {
                         _err "发送失败，请检查配置"
                     fi
                     [[ "$current_enabled" != "true" ]] && tg_set_config "enabled" "false"
+                fi
+                _pause
+                ;;
+            7)
+                echo ""
+                echo -e "  ${D}可选，用于 TG 流量统计/告警模板显示机器备注；直接回车留空${NC}"
+                read -rp "  服务器名: " new_server_name
+                tg_set_config "server_name" "$new_server_name"
+                server_name="$new_server_name"
+                if [[ -n "$new_server_name" ]]; then
+                    _ok "服务器名已保存"
+                else
+                    _ok "服务器名已清空"
                 fi
                 _pause
                 ;;
@@ -24335,12 +25605,7 @@ _show_realtime_traffic() {
     echo ""
     
     # 显示提示
-    echo -e "  ${D}提示: 此为 Xray 启动后的累计流量，同步后会重置${NC}"
-    
-    # 如果有 Sing-box 运行，提示不支持流量统计
-    if [[ "$has_singbox" == "true" ]]; then
-        echo -e "  ${D}注意: Sing-box (hy2/tuic) 暂不支持流量统计（需完整版编译）${NC}"
-    fi
+    echo -e "  ${D}提示: 此为核心 API 启动后的累计流量；执行同步后会写入数据库并重置本次计数${NC}"
 }
 
 # 立即同步流量数据
@@ -24408,11 +25673,36 @@ _sync_traffic_now() {
                 done <<< "$users"
             done
         fi
-        
-        # Sing-box 协议 (hy2/tuic) 提示不支持流量统计
+
+        # 显示 Sing-box 协议流量
         if [[ "$has_singbox" == "true" ]]; then
-            echo ""
-            echo -e "  ${D}注意: Sing-box (hy2/tuic) 暂不支持流量统计（需完整版编译）${NC}"
+            for proto in $(db_list_protocols "singbox"); do
+                local proto_name=$(get_protocol_name "$proto")
+                local users=$(db_get_users_stats "singbox" "$proto")
+                [[ -z "$users" ]] && continue
+
+                echo -e "  ${C}$proto_name${NC}"
+                while IFS='|' read -r name uuid used quota enabled port routing; do
+                    [[ -z "$name" ]] && continue
+                    local used_fmt=$(format_bytes "$used")
+                    local quota_fmt="无限制"
+                    local status="${G}●${NC}"
+
+                    if [[ "$quota" -gt 0 ]]; then
+                        quota_fmt=$(format_bytes "$quota")
+                        local percent=$((used * 100 / quota))
+                        if [[ "$percent" -ge 100 ]]; then
+                            status="${R}✗${NC}"
+                        elif [[ "$percent" -ge 80 ]]; then
+                            status="${Y}⚠${NC}"
+                        fi
+                    fi
+
+                    [[ "$enabled" != "true" ]] && status="${R}○${NC}"
+
+                    echo -e "    $status $name: $used_fmt / $quota_fmt"
+                done <<< "$users"
+            done
         fi
         
         _line
@@ -24437,16 +25727,23 @@ _configure_traffic_stats() {
         
         local notify_percent=$(tg_get_config "notify_quota_percent")
         notify_percent=${notify_percent:-80}
+        local monthly_reset_enabled=$(get_traffic_monthly_reset_enabled)
+        local monthly_reset_day=$(get_traffic_monthly_reset_day)
+        local monthly_reset_status="${R}关闭${NC}"
+        [[ "$monthly_reset_enabled" == "true" ]] && monthly_reset_status="${G}每月 ${monthly_reset_day} 日${NC}"
         
         echo -e "  自动同步: $cron_status"
         echo -e "  检测间隔: ${G}${current_interval} 分钟${NC}"
         echo -e "  告警阈值: ${G}${notify_percent}%${NC}"
+        echo -e "  月重置流量: ${monthly_reset_status}"
         _line
         
         _item "1" "启用自动同步"
         _item "2" "禁用自动同步"
         _item "3" "设置检测间隔"
         _item "4" "设置告警阈值"
+        _item "5" "设置每月重置日"
+        _item "6" "启用/禁用月重置"
         _item "0" "返回"
         _line
         
@@ -24489,6 +25786,29 @@ _configure_traffic_stats() {
                     _ok "告警阈值已设置为 ${new_percent}%"
                 else
                     _err "无效的阈值"
+                fi
+                _pause
+                ;;
+            5)
+                echo ""
+                echo -e "  ${D}设置每月自动重置流量的日期 (1-28)${NC}"
+                read -rp "  重置日 [${monthly_reset_day}]: " new_day
+                new_day="${new_day:-$monthly_reset_day}"
+                if [[ "$new_day" =~ ^[0-9]+$ ]] && [[ "$new_day" -ge 1 ]] && [[ "$new_day" -le 28 ]]; then
+                    set_traffic_monthly_reset_day "$new_day"
+                    _ok "月重置日已设置为每月 ${new_day} 日"
+                else
+                    _err "无效的日期 (请输入 1-28)"
+                fi
+                _pause
+                ;;
+            6)
+                if [[ "$monthly_reset_enabled" == "true" ]]; then
+                    set_traffic_monthly_reset_enabled "false"
+                    _ok "已禁用每月自动重置流量"
+                else
+                    set_traffic_monthly_reset_enabled "true"
+                    _ok "已启用每月自动重置流量"
                 fi
                 _pause
                 ;;
@@ -24614,6 +25934,526 @@ manage_users() {
 }
 
 #═══════════════════════════════════════════════════════════════════════════════
+# 端口转发 (Realm) + iPerf3
+#═══════════════════════════════════════════════════════════════════════════════
+REALM_DIR="$CFG/realm"
+REALM_RULES_FILE="$REALM_DIR/rules.json"
+REALM_CONFIG_FILE="$REALM_DIR/config.toml"
+REALM_BIN="/usr/local/bin/realm"
+REALM_SVC="vless-realm"
+
+ensure_realm_dir() {
+    mkdir -p "$REALM_DIR"
+    [[ -f "$REALM_RULES_FILE" ]] || echo '[]' > "$REALM_RULES_FILE"
+}
+
+install_realm_binary() {
+    if check_cmd realm; then
+        _ok "Realm 已安装: $(realm --version 2>/dev/null | head -n1)"
+        return 0
+    fi
+    _info "安装 Realm..."
+    local arch url tmp
+    arch=$(uname -m)
+    case "$arch" in
+        x86_64|amd64) arch='x86_64-unknown-linux-gnu' ;;
+        aarch64|arm64) arch='aarch64-unknown-linux-gnu' ;;
+        armv7l|armv6l) arch='armv7-unknown-linux-gnueabihf' ;;
+        *) _err "暂不支持的架构: $arch"; return 1 ;;
+    esac
+    url=$(curl -fsSL https://api.github.com/repos/zhboner/realm/releases/latest | jq -r --arg a "$arch" '.assets[] | select(.name | test($a + ".tar.gz$")) | .browser_download_url' | head -n1)
+    [[ -z "$url" ]] && { _err "获取 Realm 下载地址失败"; return 1; }
+    tmp=$(mktemp -d)
+    curl -fsSL -o "$tmp/realm.tar.gz" "$url" || return 1
+    tar -xzf "$tmp/realm.tar.gz" -C "$tmp" || return 1
+    local bin=""
+    [[ -f "$tmp/realm" ]] && bin="$tmp/realm"
+    [[ -f "$tmp/realm-slim" ]] && bin="$tmp/realm-slim"
+    [[ -z "$bin" ]] && { _err "Realm 解压后未找到二进制"; rm -rf "$tmp"; return 1; }
+    install -m 755 "$bin" "$REALM_BIN"
+    rm -rf "$tmp"
+    _ok "Realm 安装完成: $(realm --version 2>/dev/null | head -n1)"
+}
+
+create_realm_service() {
+    if [[ "$DISTRO" == "alpine" ]]; then
+        cat > "/etc/init.d/$REALM_SVC" <<'EOF'
+#!/sbin/openrc-run
+name="vless-realm"
+command="/usr/local/bin/realm"
+command_args="-c /etc/vless-reality/realm/config.toml"
+command_background=true
+pidfile="/run/vless-realm.pid"
+depend() { need net; }
+EOF
+        chmod +x "/etc/init.d/$REALM_SVC"
+    else
+        cat > "/etc/systemd/system/${REALM_SVC}.service" <<EOF
+[Unit]
+Description=VLESS Realm Forward Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=${REALM_BIN} -c ${REALM_CONFIG_FILE}
+Restart=on-failure
+RestartSec=2
+LimitNOFILE=1048576
+
+[Install]
+WantedBy=multi-user.target
+EOF
+        systemctl daemon-reload
+    fi
+}
+
+realm_generate_config() {
+    ensure_realm_dir
+    python3 - <<'PY2'
+import json
+from pathlib import Path
+rules_path=Path('/etc/vless-reality/realm/rules.json')
+conf_path=Path('/etc/vless-reality/realm/config.toml')
+rules=json.loads(rules_path.read_text()) if rules_path.exists() else []
+lines=['[log]','level = "warn"','','[network]','no_tcp = false','use_udp = true','']
+for r in rules:
+    if not r.get('enabled', True):
+        continue
+    transport=r.get('transport','tcp')
+    lines.append('[[endpoints]]')
+    lines.append(f'listen = "{r["listen_host"]}:{r["listen_port"]}"')
+    lines.append(f'remote = "{r["remote_host"]}:{r["remote_port"]}"')
+    if transport == 'udp':
+        lines.append('no_tcp = true')
+        lines.append('use_udp = true')
+    elif transport == 'tcp+udp':
+        lines.append('use_udp = true')
+    else:
+        lines.append('no_tcp = false')
+    if r.get('remark'):
+        lines.append(f'# {r["remark"]}')
+    lines.append('')
+conf_path.write_text('\n'.join(lines)+'\n')
+PY2
+}
+
+realm_sync_traffic_counters() {
+    ensure_realm_dir
+    local chain="VLESS_REALM_COUNTERS"
+    command -v iptables >/dev/null 2>&1 || return 0
+
+    iptables -N "$chain" 2>/dev/null || true
+    iptables -C INPUT -j "$chain" 2>/dev/null || iptables -I INPUT 1 -j "$chain" 2>/dev/null || true
+    iptables -F "$chain" 2>/dev/null || true
+
+    python3 - "$REALM_RULES_FILE" <<'PY2' | while IFS='|' read -r transport listen_host listen_port; do
+import json, sys
+from pathlib import Path
+p=Path(sys.argv[1])
+rules=json.loads(p.read_text()) if p.exists() else []
+for r in rules:
+    if not r.get('enabled', True):
+        continue
+    print(f"{r.get('transport','tcp')}|{r.get('listen_host','0.0.0.0')}|{r.get('listen_port','')}")
+PY2
+        [[ -z "$listen_port" ]] && continue
+        case "$transport" in
+            tcp)
+                iptables -A "$chain" -p tcp --dport "$listen_port" -m comment --comment "realm:$listen_port:tcp" -j ACCEPT 2>/dev/null || true
+                ;;
+            udp)
+                iptables -A "$chain" -p udp --dport "$listen_port" -m comment --comment "realm:$listen_port:udp" -j ACCEPT 2>/dev/null || true
+                ;;
+            tcp+udp)
+                iptables -A "$chain" -p tcp --dport "$listen_port" -m comment --comment "realm:$listen_port:tcp" -j ACCEPT 2>/dev/null || true
+                iptables -A "$chain" -p udp --dport "$listen_port" -m comment --comment "realm:$listen_port:udp" -j ACCEPT 2>/dev/null || true
+                ;;
+        esac
+    done
+}
+
+realm_get_traffic_bytes() {
+    local port="$1" proto="$2" chain="VLESS_REALM_COUNTERS"
+    command -v iptables >/dev/null 2>&1 || { echo 0; return 0; }
+    iptables -nvx -L "$chain" 2>/dev/null | awk -v p="$port" -v proto="$proto" '
+        $0 ~ ("dpt:" p) {
+            for (i=1; i<=NF; i++) {
+                if ($i == proto) { sum += $2; break }
+            }
+        }
+        END { print sum+0 }
+    '
+}
+
+realm_ping_host() {
+    local host="$1"
+    [[ -z "$host" ]] && { echo "N/A"; return 0; }
+    if echo "$host" | grep -q ':'; then
+        ping -6 -c 1 -W 2 "$host" 2>/dev/null | awk -F'time=' 'NR==2{print $2}' | awk '{print $1" ms"}' | head -n1
+    else
+        ping -4 -c 1 -W 2 "$host" 2>/dev/null | awk -F'time=' 'NR==2{print $2}' | awk '{print $1" ms"}' | head -n1
+    fi
+}
+
+realm_show_rules_status() {
+    ensure_realm_dir
+    python3 - "$REALM_RULES_FILE" <<'PY2'
+import json, sys
+from pathlib import Path
+p=Path(sys.argv[1])
+rules=json.loads(p.read_text()) if p.exists() else []
+print(json.dumps(rules, ensure_ascii=False))
+PY2
+}
+
+realm_cleanup_runtime() {
+    command -v iptables >/dev/null 2>&1 && {
+        iptables -D INPUT -j VLESS_REALM_COUNTERS 2>/dev/null || true
+        iptables -F VLESS_REALM_COUNTERS 2>/dev/null || true
+        iptables -X VLESS_REALM_COUNTERS 2>/dev/null || true
+    }
+    if svc status "$REALM_SVC" 2>/dev/null; then
+        svc stop "$REALM_SVC" 2>/dev/null || true
+    else
+        systemctl stop "$REALM_SVC" 2>/dev/null || true
+    fi
+    svc disable "$REALM_SVC" 2>/dev/null || systemctl disable "$REALM_SVC" 2>/dev/null || true
+    pkill -x realm 2>/dev/null || true
+}
+
+realm_restart_service() {
+    ensure_realm_dir
+    local rule_count
+    rule_count=$(jq 'length' "$REALM_RULES_FILE" 2>/dev/null || echo 0)
+    if [[ "$rule_count" == "0" ]]; then
+        rm -f "$REALM_CONFIG_FILE" 2>/dev/null || true
+        realm_cleanup_runtime
+        return 0
+    fi
+    realm_generate_config || return 1
+    create_realm_service || return 1
+    realm_sync_traffic_counters || true
+    svc enable "$REALM_SVC" 2>/dev/null || true
+    if svc status "$REALM_SVC" 2>/dev/null; then
+        svc restart "$REALM_SVC" || return 1
+    else
+        svc start "$REALM_SVC" || return 1
+    fi
+}
+
+realm_add_rule() {
+    install_realm_binary || return 1
+    ensure_realm_dir
+    echo ""
+    _line
+    echo -e "  ${W}转发后端选择${NC}"
+    _line
+    _item "1" "Realm"
+    _item "0" "返回"
+    echo ""
+    local backend_choice
+    read -rp "  请选择 [1]: " backend_choice
+    backend_choice="${backend_choice:-1}"
+    [[ "$backend_choice" == "0" ]] && return 0
+    [[ "$backend_choice" != "1" ]] && { _err "无效选择"; return 1; }
+
+    local remark transport_choice transport listen_host listen_port remote_host remote_port
+    read -rp "  规则备注: " remark
+    echo ""
+    _line
+    echo -e "  ${W}协议类型${NC}"
+    _line
+    _item "1" "TCP"
+    _item "2" "UDP"
+    _item "3" "TCP + UDP"
+    echo ""
+    read -rp "  请选择 [1]: " transport_choice
+    transport_choice="${transport_choice:-1}"
+    case "$transport_choice" in
+        1) transport='tcp' ;;
+        2) transport='udp' ;;
+        3) transport='tcp+udp' ;;
+        *) _err "无效选择"; return 1 ;;
+    esac
+    read -rp "  监听地址 [0.0.0.0]: " listen_host
+    listen_host="${listen_host:-0.0.0.0}"
+    read -rp "  监听端口: " listen_port
+    read -rp "  目标地址: " remote_host
+    read -rp "  目标端口: " remote_port
+    [[ -z "$listen_port" || -z "$remote_host" || -z "$remote_port" ]] && { _err "参数不能为空"; return 1; }
+    echo ""
+    echo -e "  ${C}备注:${NC} ${G}${remark:-未命名}${NC}"
+    echo -e "  ${C}协议:${NC} ${G}${transport}${NC}"
+    echo -e "  ${C}监听:${NC} ${G}${listen_host}:${listen_port}${NC}"
+    echo -e "  ${C}目标:${NC} ${G}${remote_host}:${remote_port}${NC}"
+    echo ""
+    read -rp "  确认创建? [Y/n]: " confirm
+    [[ "$confirm" =~ ^[nN]$ ]] && return 0
+    python3 - "$REALM_RULES_FILE" "$remark" "$transport" "$listen_host" "$listen_port" "$remote_host" "$remote_port" <<'PY2'
+import json, sys
+from pathlib import Path
+p=Path(sys.argv[1])
+rules=json.loads(p.read_text()) if p.exists() else []
+rules.append({
+  'backend':'realm',
+  'remark':sys.argv[2],
+  'transport':sys.argv[3],
+  'listen_host':sys.argv[4],
+  'listen_port':int(sys.argv[5]),
+  'remote_host':sys.argv[6],
+  'remote_port':int(sys.argv[7]),
+  'enabled':True
+})
+p.write_text(json.dumps(rules, ensure_ascii=False, indent=2))
+PY2
+    realm_restart_service || { _err "Realm 服务启动失败"; return 1; }
+    _ok "转发规则已创建并生效"
+}
+
+realm_list_rules() {
+    ensure_realm_dir
+    local count
+    count=$(jq 'length' "$REALM_RULES_FILE" 2>/dev/null || echo 0)
+    echo ""
+    _line
+    echo -e "  ${W}转发规则${NC}"
+    _line
+    [[ "$count" == "0" ]] && { echo -e "  ${D}暂无规则${NC}"; _line; return 0; }
+    python3 - "$REALM_RULES_FILE" <<'PY2'
+import json, sys
+from pathlib import Path
+p=Path(sys.argv[1])
+rules=json.loads(p.read_text()) if p.exists() else []
+for i, r in enumerate(rules, 1):
+    print(f"{i}) {r.get('remark') or '未命名'}")
+    print(f"   后端: {r.get('backend','realm')}")
+    print(f"   协议: {r.get('transport','tcp')}")
+    print(f"   监听: {r.get('listen_host','0.0.0.0')}:{r.get('listen_port','')}")
+    print(f"   目标: {r.get('remote_host','')}:{r.get('remote_port','')}")
+    print(f"   状态: {'已启用' if r.get('enabled', True) else '已禁用'}")
+    print()
+PY2
+    _line
+}
+
+realm_delete_rule() {
+    ensure_realm_dir
+    local count
+    count=$(jq 'length' "$REALM_RULES_FILE" 2>/dev/null || echo 0)
+    [[ "$count" == "0" ]] && { _warn "暂无规则可删除"; return 0; }
+    realm_list_rules
+    local idx
+    read -rp "  选择要删除的规则编号 [1-${count}]，0返回: " idx
+    [[ "$idx" == "0" ]] && return 0
+    [[ ! "$idx" =~ ^[0-9]+$ ]] && { _err "无效选择"; return 1; }
+    ((idx>=1 && idx<=count)) || { _err "超出范围"; return 1; }
+    read -rp "  确认删除? [y/N]: " confirm
+    [[ ! "$confirm" =~ ^[yY]$ ]] && return 0
+    python3 - "$REALM_RULES_FILE" "$idx" <<'PY2'
+import json, sys
+from pathlib import Path
+p=Path(sys.argv[1])
+rules=json.loads(p.read_text()) if p.exists() else []
+del rules[int(sys.argv[2])-1]
+p.write_text(json.dumps(rules, ensure_ascii=False, indent=2))
+PY2
+    realm_restart_service || true
+    _ok "规则已删除"
+}
+
+realm_status_logs_menu() {
+    while true; do
+        _header
+        echo -e "  ${W}转发状态 / 日志${NC}"
+        _line
+        if check_cmd realm; then
+            echo -e "  ${G}Realm 已安装${NC}: $(realm --version 2>/dev/null | head -n1)"
+        else
+            echo -e "  ${R}Realm 未安装${NC}"
+        fi
+        if svc status "$REALM_SVC" 2>/dev/null || systemctl is-active --quiet "$REALM_SVC" 2>/dev/null || pgrep -x realm >/dev/null 2>&1; then
+            echo -e "  ${G}服务状态: 运行中${NC}"
+        else
+            echo -e "  ${R}服务状态: 未运行${NC}"
+        fi
+        [[ -f "$REALM_RULES_FILE" ]] && echo -e "  ${D}规则文件: ${REALM_RULES_FILE}${NC}" || echo -e "  ${R}规则文件缺失: ${REALM_RULES_FILE}${NC}"
+        [[ -f "$REALM_CONFIG_FILE" ]] && echo -e "  ${D}配置文件: ${REALM_CONFIG_FILE}${NC}" || echo -e "  ${R}配置文件缺失: ${REALM_CONFIG_FILE}${NC}"
+        _line
+        _item "1" "查看服务状态"
+        _item "2" "查看最近日志"
+        _item "3" "重启转发服务"
+        _item "0" "返回"
+        _line
+        read -rp "  请选择: " choice
+        case "$choice" in
+            1)
+                _header
+                echo -e "  ${W}转发状态${NC}"
+                _line
+                local service_state="未运行"
+                if svc status "$REALM_SVC" >/dev/null 2>&1 || systemctl is-active --quiet "$REALM_SVC" 2>/dev/null; then
+                    service_state="运行中"
+                elif pgrep -x realm >/dev/null 2>&1; then
+                    service_state="运行中"
+                fi
+                echo -e "  ${C}服务状态:${NC} ${G}${service_state}${NC}"
+                echo ""
+                local count idx remark transport listen_host listen_port remote_host remote_port enabled ping_value tcp_bytes udp_bytes total_bytes tcp_state udp_state
+                count=$(jq 'length' "$REALM_RULES_FILE" 2>/dev/null || echo 0)
+                if [[ "$count" == "0" ]]; then
+                    echo -e "  ${D}当前没有转发规则${NC}"
+                else
+                    for idx in $(seq 0 $((count-1))); do
+                        remark=$(jq -r '.['"$idx"'].remark // "未命名"' "$REALM_RULES_FILE")
+                        transport=$(jq -r '.['"$idx"'].transport // "tcp"' "$REALM_RULES_FILE")
+                        listen_host=$(jq -r '.['"$idx"'].listen_host // "0.0.0.0"' "$REALM_RULES_FILE")
+                        listen_port=$(jq -r ".[$idx].listen_port" "$REALM_RULES_FILE")
+                        remote_host=$(jq -r ".[$idx].remote_host" "$REALM_RULES_FILE")
+                        remote_port=$(jq -r ".[$idx].remote_port" "$REALM_RULES_FILE")
+                        enabled=$(jq -r ".[$idx].enabled // true" "$REALM_RULES_FILE")
+                        ping_value=$(realm_ping_host "$remote_host")
+                        [[ -z "$ping_value" ]] && ping_value="超时/N/A"
+                        tcp_bytes=$(realm_get_traffic_bytes "$listen_port" tcp)
+                        udp_bytes=$(realm_get_traffic_bytes "$listen_port" udp)
+                        total_bytes=$((tcp_bytes + udp_bytes))
+                        tcp_state=$(ss -lnt 2>/dev/null | awk -v p=":$listen_port" '$4 ~ p"$" {found=1} END{print found?"运行中":"-"}')
+                        udp_state=$(ss -lnu 2>/dev/null | awk -v p=":$listen_port" '$4 ~ p"$" {found=1} END{print found?"运行中":"-"}')
+                        echo -e "  ${G}● ${remark}${NC}"
+                        echo -e "    规则      : ${G}${listen_host}:${listen_port}${NC} → ${G}${remote_host}:${remote_port}${NC}"
+                        echo -e "    状态      : $( [[ "$enabled" == "true" ]] && echo 运行中 || echo 已禁用 )"
+                        echo -e "    总流量    : $(format_bytes "$total_bytes")"
+                        echo -e "    TCP / UDP : $(format_bytes "$tcp_bytes") / $(format_bytes "$udp_bytes")"
+                        echo -e "    Ping      : ${ping_value}"
+                        echo -e "    监听端口  : ${listen_port}"
+                        echo -e "    监听状态  : TCP ${tcp_state} / UDP ${udp_state}"
+                        echo -e "    协议      : ${transport}"
+                        echo ""
+                    done
+                fi
+                _line
+                _pause
+                ;;
+            2)
+                _header
+                echo -e "  ${W}Realm 最近日志${NC}"
+                _line
+                if [[ "$DISTRO" == "alpine" ]]; then
+                    rc-service "$REALM_SVC" status 2>/dev/null || true
+                else
+                    journalctl -u "$REALM_SVC" -n 50 --no-pager 2>/dev/null || true
+                fi
+                _pause
+                ;;
+            3)
+                _header
+                echo -e "  ${W}重启转发服务${NC}"
+                _line
+                if realm_restart_service; then
+                    _ok "重启完成"
+                else
+                    _err "重启失败"
+                fi
+                _pause
+                ;;
+            0) return ;;
+            *) _err "无效选择"; _pause ;;
+        esac
+    done
+}
+
+iperf3_status_menu() {
+    _header
+    echo -e "  ${W}iPerf3 状态${NC}"
+    _line
+    if pgrep -x iperf3 >/dev/null 2>&1; then
+        echo -e "  ${C}服务状态:${NC} ${G}运行中${NC}"
+        echo ""
+        ss -tulnp 2>/dev/null | grep iperf3 | sed 's/^/  /'
+    else
+        echo -e "  ${C}服务状态:${NC} ${D}未运行${NC}"
+    fi
+    _line
+}
+
+stop_iperf3_server_menu() {
+    _header
+    echo -e "  ${W}停止 iPerf3 服务端${NC}"
+    _line
+    if pgrep -x iperf3 >/dev/null 2>&1; then
+        pkill iperf3 2>/dev/null || true
+        sleep 1
+        _ok "iPerf3 服务端已停止"
+    else
+        _warn "当前没有运行中的 iPerf3 服务端"
+    fi
+}
+
+start_iperf3_server_menu() {
+    check_cmd iperf3 || {
+        _info "安装 iPerf3..."
+        case "$DISTRO" in
+            alpine) apk add --no-cache iperf3 >/dev/null 2>&1 ;;
+            centos) yum install -y iperf3 >/dev/null 2>&1 ;;
+            debian|ubuntu) apt-get update -qq >/dev/null 2>&1; DEBIAN_FRONTEND=noninteractive apt-get install -y -qq iperf3 >/dev/null 2>&1 ;;
+        esac
+    }
+    check_cmd iperf3 || { _err "iPerf3 安装失败"; return 1; }
+    local listen_host listen_port
+    read -rp "  监听地址 [0.0.0.0]: " listen_host
+    listen_host="${listen_host:-0.0.0.0}"
+    read -rp "  监听端口 [5201]: " listen_port
+    listen_port="${listen_port:-5201}"
+    pkill iperf3 2>/dev/null || true
+    if [[ "$listen_host" == "0.0.0.0" ]]; then
+        iperf3 -s -D -p "$listen_port"
+    else
+        nohup iperf3 -s -B "$listen_host" -p "$listen_port" >/tmp/iperf3-server.log 2>&1 < /dev/null &
+    fi
+    sleep 1
+    local server_ip
+    server_ip=$(get_ipv4)
+    [[ -z "$server_ip" ]] && server_ip=$(get_ipv6)
+    _ok "iPerf3 服务端已启动: ${listen_host}:${listen_port}"
+    echo -e "  ${Y}后台运行中${NC}，不会在按回车后自动停止。"
+    echo ""
+    echo -e "  ${Y}客户端 TCP 上行测试:${NC}"
+    echo -e "  ${G}iperf3 -c ${server_ip} -p ${listen_port} -t 10${NC}"
+    echo -e "  ${Y}客户端 TCP 下行测试:${NC}"
+    echo -e "  ${G}iperf3 -c ${server_ip} -p ${listen_port} -R -t 10${NC}"
+    echo -e "  ${Y}客户端 UDP 上行测试:${NC}"
+    echo -e "  ${G}iperf3 -c ${server_ip} -p ${listen_port} -u -b 200M -t 10${NC}"
+}
+
+manage_port_forwarding() {
+    while true; do
+        _header
+        echo -e "  ${W}端口转发${NC}"
+        _line
+        _item "1" "新建转发规则"
+        _item "2" "查看转发规则"
+        _item "3" "删除转发规则"
+        _item "4" "转发状态 / 日志"
+        _item "5" "启动 iPerf3 服务端"
+        _item "6" "查看 iPerf3 状态"
+        _item "7" "停止 iPerf3 服务端"
+        _item "0" "返回"
+        _line
+        read -rp "  请选择: " choice
+        case "$choice" in
+            1) realm_add_rule; _pause ;;
+            2) realm_list_rules; _pause ;;
+            3) realm_delete_rule; _pause ;;
+            4) realm_status_logs_menu ;;
+            5) start_iperf3_server_menu; _pause ;;
+            6) iperf3_status_menu; _pause ;;
+            7) stop_iperf3_server_menu; _pause ;;
+            0) return ;;
+            *) _err "无效选择" ;;
+        esac
+    done
+}
+
+#═══════════════════════════════════════════════════════════════════════════════
 # 脚本更新与主入口
 #═══════════════════════════════════════════════════════════════════════════════
 
@@ -24700,6 +26540,7 @@ main_menu() {
     init_log  # 初始化日志
     init_db   # 初始化 JSON 数据库
     db_migrate_to_multiuser  # 迁移旧的单用户配置到多用户格式
+    ensure_singbox_runtime_consistency 2>/dev/null || true
 
     # 自动更新系统脚本 (确保 vless 命令始终是最新版本)
     _auto_update_system_script
@@ -24779,14 +26620,15 @@ main_menu() {
             _item "7" "管理协议服务"
             _item "8" "分流管理"
             _item "9" "CF Tunnel(Argo)"
+            _item "10" "端口转发"
             echo -e "  ${D}───────────────────────────────────────────${NC}"
-            _item "10" "BBR 网络优化"
-            _item "11" "查看运行日志"
+            _item "11" "BBR 网络优化"
+            _item "12" "查看运行日志"
             echo -e "  ${D}───────────────────────────────────────────${NC}"
             local script_update_item="检查脚本更新"
             [[ -n "$script_update_ver" ]] && script_update_item="检查脚本更新 ${Y}[有更新 v${script_update_ver}]${NC}"
-            _item "12" "$script_update_item"
-            _item "13" "完全卸载"
+            _item "13" "$script_update_item"
+            _item "14" "完全卸载"
         else
             _item "1" "安装协议"
             echo -e "  ${D}───────────────────────────────────────────${NC}"
@@ -24811,10 +26653,11 @@ main_menu() {
                 7) manage_protocol_services; skip_pause=true ;;
                 8) manage_routing; skip_pause=true ;;
                 9) manage_cloudflare_tunnel; skip_pause=true ;;
-                10) enable_bbr; skip_pause=true ;;
-                11) show_logs; skip_pause=true ;;
-                12) do_update ;;
-                13) do_uninstall ;;
+                10) manage_port_forwarding; skip_pause=true ;;
+                11) enable_bbr; skip_pause=true ;;
+                12) show_logs; skip_pause=true ;;
+                13) do_update ;;
+                14) do_uninstall ;;
                 0) exit 0 ;;
                 *) _err "无效选择"; skip_pause=true ;;
             esac
