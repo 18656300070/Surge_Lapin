@@ -1,5 +1,4 @@
 ###主要学术类型域名
-DOMAIN-SUFFIX,colab.research.google.com
 DOMAIN-SUFFIX,kaggle.com
 DOMAIN-SUFFIX,zh.annas-archive.org
 DOMAIN-SUFFIX,annas-archive.org
@@ -21,6 +20,9 @@ DOMAIN-SUFFIX,download.pytorch.org
 DOMAIN-SUFFIX,funo.top
 DOMAIN-SUFFIX,vps.funo.top
 DOMAIN-SUFFIX,sms.funo.top
+DOMAIN-SUFFIX,wallos.funo.top
+DOMAIN-SUFFIX,affine.funo.top
+DOMAIN-SUFFIX,clash.funo.top
 DOMAIN-SUFFIX,ieeei.study
 DOMAIN-SUFFIX,vps.ieeei.study
 DOMAIN-SUFFIX,wallos.ieeei.study
@@ -28,11 +30,13 @@ DOMAIN-SUFFIX,sms.ieeei.study
 
 ###收集网站
 DOMAIN-SUFFIX,dmit.io
+DOMAIN-SUFFIX,bandwagonhost.com
+DOMAIN-SUFFIX,rfchost.com
 DOMAIN-SUFFIX,cstserver.com
 DOMAIN-SUFFIX,vipcloud.cc
+DOMAIN-SUFFIX,cloud.vipcloud.cc
 DOMAIN-SUFFIX,legendvps.com
-DOMAIN-SUFFIX,bandwagonhost.com
 DOMAIN-SUFFIX,aethercloud.io
 DOMAIN-SUFFIX,billing.aethercloud.io
-DOMAIN-SUFFIX,www.geelinx.com
-DOMAIN-SUFFIX,geelinx.com
+DOMAIN-SUFFIX,iaclouds.com
+DOMAIN-SUFFIX,vps.taipei
