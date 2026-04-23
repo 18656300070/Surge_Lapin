@@ -1,5 +1,3 @@
-#境内域外网站
-
 ###国内论坛
 DOMAIN-SUFFIX,linux.do
 DOMAIN-SUFFIX,credit.linux.do
@@ -7,3 +5,23 @@ DOMAIN-SUFFIX,nodeseek.com
 DOMAIN-SUFFIX,seek.li
 DOMAIN-SUFFIX,nodeimage.com
 DOMAIN-SUFFIX,deepflood.com
+
+# > 全球/港台影评
+DOMAIN-SUFFIX,imdb.com
+DOMAIN-SUFFIX,rottentomatoes.com
+DOMAIN-SUFFIX,metacritic.com
+DOMAIN-SUFFIX,letterboxd.com
+DOMAIN-SUFFIX,hkmovie6.com
+DOMAIN-SUFFIX,trakt.tv
+
+# > 动漫与二次元 (不含大陆)
+DOMAIN-SUFFIX,chii.in
+DOMAIN-SUFFIX,myanimelist.net
+DOMAIN-SUFFIX,anilist.co
+DOMAIN-SUFFIX,vndb.org
+
+# > 媒体数据库 (元数据与海报)
+DOMAIN-SUFFIX,themoviedb.org
+DOMAIN-SUFFIX,tmdb.org
+DOMAIN-SUFFIX,thetvdb.com
+DOMAIN-SUFFIX,fanart.tv
