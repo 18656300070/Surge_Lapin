@@ -10,6 +10,10 @@ DOMAIN-SUFFIX,seek.li
 DOMAIN-SUFFIX,nodeimage.com
 DOMAIN-SUFFIX,deepflood.com
 
+###python库
+DOMAIN-SUFFIX,pypi.org
+DOMAIN-SUFFIX,download.pytorch.org
+
 ###个人域名网站
 DOMAIN-SUFFIX,funo.top
 DOMAIN-SUFFIX,vps.funo.top
