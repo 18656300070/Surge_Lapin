@@ -8,10 +8,6 @@ DOMAIN-SUFFIX,wellesu.com
 DOMAIN-SUFFIX,tesble.com
 DOMAIN-SUFFIX,pismin.com
 
-###python库
-DOMAIN-SUFFIX,pypi.org
-DOMAIN-SUFFIX,download.pytorch.org
-
 # > 全球/港台影评
 DOMAIN-SUFFIX,imdb.com
 DOMAIN-SUFFIX,rottentomatoes.com
